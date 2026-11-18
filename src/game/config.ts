@@ -107,7 +107,7 @@ export const TIME = {
   /** Slot when the day's event happens (7 PM). */
   eventTick: 9,
   /** Real seconds per game day at 1x. */
-  secondsPerDay: 6,
+  secondsPerDay: 20,
   speeds: [0, 1, 2, 4] as const,
   /** Rent and staff are paid on this weekday (0 = Monday). Runs at end of day. */
   billsWeekday: 6,
@@ -167,4 +167,28 @@ export const FIXTURE_EFFECTS = {
 export const FLOOR_SIZE: Record<VenueType, { width: number; height: number }> = {
   gallery: { width: 8, height: 8 },
   museum: { width: 10, height: 10 },
+};
+
+/** Named guests: how they move and how much they matter. Durations are in game hours. */
+export const GUESTS = {
+  walkTilesPerHour: 3.2,
+  lookHours: 0.9,
+  reactHours: 0.6,
+  actionHours: 0.7,
+  chatHours: 1.1,
+  /** Score thresholds for reactions (0..1). */
+  impressedAt: 0.62,
+  thinkAt: 0.38,
+  /** Works a guest looks at per visit (critics look at more). */
+  worksPerVisit: 3,
+  /** Last hour slot a guest will walk in (doors close at the end of the day). */
+  lastArrivalTick: 8,
+  /** Daily decay of buzz from photos and posts. */
+  buzzDecay: 0.85,
+  /** Buzz from one post at full enthusiasm. */
+  influencerBuzz: 30,
+  photographerBuzz: 8,
+  /** Reputation per review star away from 3. */
+  reviewWeight: 1.4,
+  harshReviewWeight: 2.2,
 };

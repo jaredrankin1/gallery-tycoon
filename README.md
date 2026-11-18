@@ -20,14 +20,19 @@ node scripts/build-single.mjs   # one self-contained HTML file in dist/
 
 ## The loop
 
-The game runs in real time. A day lasts about 6 seconds at normal speed, and
+The first run is guided: you see the empty room right away, and Theo (your
+first regular) walks you through gallery or museum, where the money comes from,
+and the name, one choice at a time. The room behind updates as you pick.
+
+The game runs in real time. A day lasts about 20 seconds at normal speed, and
 you can pause or play at 1x, 2x or 4x from the top bar. Doors open at 10 AM
 and each hour is one simulation step.
 
 - **Art**: buy works that turn up on the market each day. Artists who like you offer more often and give a discount.
 - **Floor**: tap a wall spot or pedestal to hang art, set its price (gallery) or take it down. Tap a painting on the wall to inspect it.
 - **Build**: wall spots, pedestals, a wine bar, benches and plants on the isometric grid, with a live placement preview.
-- **Artists**: studio visits build relationships, and neglect cools them. "Give a show" opens the event planner with that artist already picked.
+- **Visitors**: eight named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
+- **Artists** (under People): studio visits build relationships, and neglect cools them. "Give a show" opens the event planner with that artist already picked.
 - **Events**: book an opening, reception, talk or gala on a future night. Choose featured artists, wine and cheese tiers, and how many guests to cater for. Events happen at 7 PM, with a crowd holding glasses on the floor.
 - **Books**: the last 14 days of income and spending, weekly art and wine & cheese budgets, the ticket price (museum), and the ledger.
 
@@ -55,20 +60,26 @@ src/
       floor.ts          Isometric floor plan: fixtures, placement rules, hanging
       ledger.ts         All cash moves through post(), with a category
       feed.ts           notify(): things the player should hear about (toasts)
+      taste.ts          How a visitor feels about a work (likes, dislikes, fame, mood)
+      visits.ts         Visitor arrivals, visit plans, the shared walk timeline, outcomes
     venues/
       types.ts          VenueModel interface (how a venue earns money)
       gallery.ts        Hourly sale rolls off the floor, and sales at events
       museum.ts         Ticket sales, collection appeal, price demand
-  data/artists.ts       Placeholder artist personas and artwork title parts
+  data/artists.ts       Artist personas (with style tags) and artwork title parts
+  data/guests.ts        Visitor characters: role, tastes, budget, traits, lines
   render/
     iso.ts              Isometric projection math (grid <-> screen)
-    IsoRenderer.ts      Canvas renderer: walls, floor, fixtures, art, wandering visitors, tap-to-tile
+    IsoRenderer.ts      Canvas renderer: walls, floor, fixtures, art, animated visitors, tap targets
+    sprites.ts          Sprite atlases and portraits (built by tools/slice_sprites.py)
   ui/                   Preact UI
     store.ts            Holds the game, runs the real-time clock, autosaves
     Game.tsx            HUD, speed controls, dock, toasts, canvas wiring
+    Onboarding.tsx      Guided first run over the live room
+    GuestCard.tsx       Card for a visitor you tapped
     Inspector.tsx       Card for whatever tile you tapped
     BuildTray.tsx       Build mode
-    sheets/             Art, Artists, Events, Books slide-up sheets
+    sheets/             Art, People (visitors + artists), Events, Books slide-up sheets
 tests/game.test.ts      Logic tests
 ```
 
@@ -79,7 +90,8 @@ tests/game.test.ts      Logic tests
 - **New fixture** (lighting, gift shop, coat check): add to `FixtureKind`, `FIXTURE`, draw it in `IsoRenderer.drawFixture`, and give it an effect in a system.
 - **New venue type**: implement `VenueModel` in `venues/` and register it in `venues/index.ts`.
 - **Balance**: almost everything is in `config.ts`.
-- **Art**: the renderer draws everything procedurally. Swap in sprites in `IsoRenderer` without touching game logic.
+- **New visitor**: drop a sprite sheet in `art/source/`, run `python3 tools/slice_sprites.py`, and add a seed to `src/data/guests.ts`.
+- **Art**: rooms and paintings are procedural; characters come from the sheets in `art/source/`.
 
 ## Design rules
 

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { canPlace, clockLabel, fixtureAt, TIME, VENUE, weekday, type Action } from '../game';
+import { absHour, canPlace, clockLabel, fixtureAt, TIME, VENUE, weekday, type Action } from '../game';
 import { IsoRenderer } from '../render/IsoRenderer';
 import { shortMoney } from './bits';
 import { BuildTray } from './BuildTray';
 import { Ctx, type GameCtx, type SheetId, type Ui } from './context';
 import { Icon } from './icons';
 import { Inspector } from './Inspector';
-import { ArtistsSheet } from './sheets/Artists';
+import { PeopleSheet } from './sheets/People';
+import { GuestCard } from './GuestCard';
+import { Onboarding } from './Onboarding';
+import { portraitUrl } from '../render/sprites';
 import { BooksSheet } from './sheets/Books';
 import { CollectionSheet } from './sheets/Collection';
 import { EventsSheet } from './sheets/Events';
@@ -15,29 +18,31 @@ import { useStore, type Store } from './store';
 interface Toast {
   id: number;
   text: string;
-  tone: 'error' | 'info' | 'sale' | 'event' | 'warn';
+  tone: 'error' | 'info' | 'sale' | 'event' | 'warn' | 'guest' | 'review';
+  /** Sprite name, to show the guest's face. */
+  face?: string;
 }
 
 const DOCK: { id: SheetId | 'build'; label: string; icon: string }[] = [
   { id: 'build', label: 'Build', icon: 'build' },
   { id: 'collection', label: 'Art', icon: 'art' },
-  { id: 'artists', label: 'Artists', icon: 'artists' },
+  { id: 'people', label: 'People', icon: 'artists' },
   { id: 'events', label: 'Events', icon: 'events' },
   { id: 'books', label: 'Books', icon: 'books' },
 ];
 
-export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
+export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store; onQuit: () => void; onboarding: boolean; onSetupDone: () => void }) {
   const state = useStore(store);
-  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null });
+  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', coach: false });
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const setUi = useCallback((patch: Partial<Ui>) => setUiState((u) => ({ ...u, ...patch })), []);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(0);
-  const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
+  const toast = useCallback((text: string, tone: Toast['tone'] = 'info', face?: string) => {
     const id = ++toastSeq.current;
-    setToasts((t) => [...t.slice(-2), { id, text, tone }]);
+    setToasts((t) => [...t.slice(-2), { id, text, tone, face }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === 'error' ? 2600 : 3800);
   }, []);
 
@@ -71,8 +76,13 @@ export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
       }
       if (u.sheet) return setUi({ sheet: null });
       const same = u.selected && u.selected.x === x && u.selected.y === y;
-      setUi({ selected: same ? null : { x, y } });
+      setUi({ selected: same ? null : { x, y }, guest: null });
+    }, (guestId) => {
+      const u = uiRef.current;
+      if (u.building) return;
+      setUi({ guest: u.guest === guestId ? null : guestId, selected: null, sheet: null });
     });
+    r.setClock(() => absHour(store.state) + store.hourProgress);
     rendererRef.current = r;
     return () => r.destroy();
   }, []);
@@ -81,19 +91,29 @@ export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
     const r = rendererRef.current!;
     r.setState(state);
     r.setSelected(ui.building ? null : ui.selected);
+    r.setSelectedGuest(ui.guest);
+    if (onboarding) r.setInsets(0.1, 0.5);
+    else r.setInsets(0.17, 0.11);
     r.setBuildKind(ui.building && ui.build && ui.build !== 'remove' ? ui.build : null);
   });
 
   // ---- feed -> toasts + floating labels ----
   const seenFeed = useRef(state.feedSeq);
   useEffect(() => {
+    if (onboarding) {
+      seenFeed.current = state.feedSeq;
+      return;
+    }
     const fresh = state.feed.filter((f) => f.id > seenFeed.current);
     seenFeed.current = state.feedSeq;
     for (const f of fresh) {
       if (f.at && f.amount) rendererRef.current?.pop(f.at.x, f.at.y, `+${shortMoney(f.amount)}`);
-      toast(f.text, f.kind === 'sale' || f.kind === 'tickets' ? 'sale' : f.kind === 'event' ? 'event' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info');
+      const face = f.guestId ? state.guests[f.guestId]?.sprite : undefined;
+      const tone: Toast['tone'] =
+        f.kind === 'sale' || f.kind === 'tickets' ? 'sale' : f.kind === 'event' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
+      toast(f.text, tone, face);
     }
-  }, [state.feedSeq]);
+  }, [state.feedSeq, onboarding]);
 
   // ---- cash flash ----
   const lastCash = useRef(state.cash);
@@ -119,9 +139,25 @@ export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
   const dayFraction = (state.tick + store.hourProgress) / TIME.ticksPerDay;
 
   const openDock = (id: SheetId | 'build') => {
-    if (id === 'build') setUi({ building: !ui.building, build: null, sheet: null, selected: null });
-    else setUi({ sheet: ui.sheet === id ? null : id, building: false, build: null, selected: null });
+    if (id === 'build') setUi({ building: !ui.building, build: null, sheet: null, selected: null, guest: null });
+    else setUi({ sheet: ui.sheet === id ? null : id, building: false, build: null, selected: null, guest: null, coach: id === 'collection' ? false : ui.coach });
   };
+
+  if (onboarding) {
+    return (
+      <Ctx.Provider value={ctx}>
+        <div class="game">
+          <canvas ref={canvasRef} class="iso" />
+          <Onboarding
+            onDone={(fresh) => {
+              onSetupDone();
+              setUi({ coach: fresh, guest: null, selected: null, sheet: null });
+            }}
+          />
+        </div>
+      </Ctx.Provider>
+    );
+  }
 
   return (
     <Ctx.Provider value={ctx}>
@@ -170,7 +206,8 @@ export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
         <div class="toasts" aria-live="polite">
           {toasts.map((t) => (
             <div key={t.id} class={`toast ${t.tone}`}>
-              {t.text}
+              {t.face && <img class="toast-face" src={portraitUrl(t.face)} alt="" />}
+              <span>{t.text}</span>
             </div>
           ))}
         </div>
@@ -182,10 +219,20 @@ export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
         )}
 
         {ui.selected && !ui.building && !ui.sheet && <Inspector />}
+        {ui.guest && !ui.building && !ui.sheet && <GuestCard id={ui.guest} />}
+        {ui.coach && !ui.sheet && !ui.building && (
+          <div class="coach">
+            <img src={portraitUrl('theo')} alt="" />
+            <p>Walls look bare. Tap <b>Art</b> below and buy your first piece, then tap a wall spot to hang it.</p>
+            <button class="icon-btn" onClick={() => setUi({ coach: false })} aria-label="Dismiss">
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+        )}
         {ui.building && <BuildTray />}
 
         {ui.sheet === 'collection' && <CollectionSheet />}
-        {ui.sheet === 'artists' && <ArtistsSheet />}
+        {ui.sheet === 'people' && <PeopleSheet />}
         {ui.sheet === 'events' && <EventsSheet />}
         {ui.sheet === 'books' && <BooksSheet />}
 
@@ -194,7 +241,7 @@ export function Game({ store, onQuit }: { store: Store; onQuit: () => void }) {
             const on = d.id === 'build' ? ui.building : ui.sheet === d.id;
             const badge = d.id === 'events' ? state.events.length : d.id === 'collection' ? Object.values(state.artworks).filter((w) => w.status === 'storage').length : 0;
             return (
-              <button class={on ? 'on' : ''} onClick={() => openDock(d.id)}>
+              <button class={`${on ? 'on' : ''} ${ui.coach && d.id === 'collection' ? 'pulse' : ''}`} onClick={() => openDock(d.id)}>
                 <span class="dock-icon">
                   <Icon name={d.icon} />
                   {badge > 0 && <i class="badge">{badge}</i>}

@@ -26,6 +26,8 @@ export interface Artist {
   lastVisitDay?: number;
   /** Persona tags used by content/events, e.g. "loves-wine", "reclusive". */
   traits: string[];
+  /** What their work is like. Guests' tastes are matched against these. */
+  tags: string[];
 }
 
 export type ArtworkStatus = 'offered' | 'storage' | 'display' | 'sold';
@@ -95,7 +97,8 @@ export type LedgerCategory =
   | 'artist-care'
   | 'fit-out'
   | 'sales'
-  | 'tickets';
+  | 'tickets'
+  | 'donations';
 
 export interface LedgerEntry {
   day: number;
@@ -114,7 +117,7 @@ export interface DayReport {
   sales: number;
 }
 
-export type FeedKind = 'sale' | 'tickets' | 'event' | 'artist' | 'bills' | 'market' | 'warn';
+export type FeedKind = 'sale' | 'tickets' | 'event' | 'artist' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
 
 /** Something worth telling the player about, as it happens. The UI shows new ones as toasts. */
 export interface FeedItem {
@@ -123,6 +126,8 @@ export interface FeedItem {
   kind: FeedKind;
   text: string;
   amount?: number;
+  /** Guest it's about, for showing their portrait. */
+  guestId?: Id;
   /** Tile to pop a floating label over, if it happened somewhere on the floor. */
   at?: { x: number; y: number };
 }
@@ -164,8 +169,77 @@ export interface FloorPlan {
   fixtures: Fixture[];
 }
 
+// ---- Guests: named visitors with tastes -------------------------------------
+
+export type GuestRole = 'collector' | 'critic' | 'influencer' | 'student' | 'regular';
+
+/** Things guests do on the floor. Each has a sprite animation of the same name. */
+export type GuestAnim = 'idle' | 'walk' | 'look' | 'think' | 'impressed' | 'disapprove' | 'photo' | 'notes' | 'chat';
+export type Reaction = 'impressed' | 'think' | 'disapprove';
+
+export interface Guest {
+  id: Id;
+  name: string;
+  /** Short label shown under the name, e.g. "Collector". */
+  title: string;
+  role: GuestRole;
+  bio: string;
+  /** Sprite sheet name in src/assets/sprites. */
+  sprite: string;
+  likes: string[];
+  dislikes: string[];
+  /** Personality hooks: photographer, note-taker, chatty, buyer, wine-lover, cheese-snob, fame-chaser, freeloader, hard-to-please. */
+  traits: string[];
+  /** Most they'll pay for one work (collectors, regulars who buy). 0 = never buys. */
+  budget: number;
+  /** Highest price/value ratio they'll accept. */
+  priceTolerance: number;
+  /** Won't visit until your reputation reaches this. */
+  minReputation: number;
+  /** Typical visits per week when they like you. */
+  visitsPerWeek: number;
+  /** Signature lines, picked by mood. */
+  lines: { love: string[]; meh: string[]; hate: string[] };
+  /** -100 .. 100: how they feel about your place. */
+  affinity: number;
+  visits: number;
+  lastVisitDay: number;
+  /** Tags you have learned they like or dislike by watching them. */
+  knownLikes: string[];
+  knownDislikes: string[];
+  /** Their last verdict, shown in the Guests panel. */
+  lastWords?: string;
+  /** Favourite work they've seen here. */
+  favoriteArtworkId?: Id;
+}
+
+/** One planned stop on a visit. Positions are tile coordinates (floats are tile centres). */
+export interface VisitStep {
+  artworkId: Id;
+  /** Where they stand. */
+  at: { x: number; y: number };
+  /** Face screen-left (true) or screen-right. */
+  faceLeft: boolean;
+  score: number;
+  reaction: Reaction;
+  action?: 'photo' | 'notes';
+}
+
+export interface GuestVisit {
+  guestId: Id;
+  /** Absolute game hour they walked in (fractional allowed). See absHour(). */
+  start: number;
+  /** Absolute hour they're gone. */
+  end: number;
+  steps: VisitStep[];
+  /** Guest they'll stop and talk to at the end, if any. */
+  chatWith?: Id;
+  /** Came for tonight's event. */
+  event?: boolean;
+}
+
 export interface GameState {
-  version: 2;
+  version: 3;
   name: string;
   difficulty: Difficulty;
   venue: VenueType;
@@ -181,6 +255,11 @@ export interface GameState {
   artists: Record<Id, Artist>;
   artworks: Record<Id, Artwork>;
   floor: FloorPlan;
+  guests: Record<Id, Guest>;
+  /** Guests in the building right now. */
+  visits: GuestVisit[];
+  /** Word of mouth from photos and posts. Extra daily visitors; decays every day. */
+  buzz: number;
   events: ScheduledEvent[];
   ledger: LedgerEntry[];
   /** Running totals for the day in progress. */

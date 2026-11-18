@@ -13,6 +13,7 @@ export const ARTIST_SEEDS: ArtistSeed[] = [
     fame: 35,
     temperament: 0.8,
     traits: ['loves-wine', 'social'],
+    tags: ['painting', 'portrait', 'figurative', 'moody', 'classic'],
   },
   {
     id: 'a-tobias',
@@ -23,6 +24,7 @@ export const ARTIST_SEEDS: ArtistSeed[] = [
     fame: 20,
     temperament: 1.4,
     traits: ['reclusive', 'cheese-snob'],
+    tags: ['sculpture', 'industrial', 'experimental', 'rough'],
   },
   {
     id: 'a-junie',
@@ -33,6 +35,7 @@ export const ARTIST_SEEDS: ArtistSeed[] = [
     fame: 55,
     temperament: 1.1,
     traits: ['social', 'trendy'],
+    tags: ['digital', 'colorful', 'pop', 'trendy'],
   },
   {
     id: 'a-hollis',
@@ -43,6 +46,7 @@ export const ARTIST_SEEDS: ArtistSeed[] = [
     fame: 10,
     temperament: 0.5,
     traits: ['easygoing'],
+    tags: ['painting', 'landscape', 'quiet', 'classic'],
   },
   {
     id: 'a-sable',
@@ -53,6 +57,7 @@ export const ARTIST_SEEDS: ArtistSeed[] = [
     fame: 75,
     temperament: 1.5,
     traits: ['diva', 'loves-wine'],
+    tags: ['installation', 'experimental', 'minimal', 'prestige'],
   },
 ];
 

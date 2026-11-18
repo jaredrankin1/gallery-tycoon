@@ -1,4 +1,16 @@
-import { canPlace, getVenueModel, TIME, type Fixture, type FixtureKind, type GameState } from '../game';
+import {
+  canPlace,
+  poseAt,
+  shortName,
+  TIME,
+  visitTimeline,
+  type Fixture,
+  type FixtureKind,
+  type GameState,
+  type GuestVisit,
+  type Segment,
+} from '../game';
+import { atlas, preloadSprites, SPRITES } from './sprites';
 import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
 
 export interface Theme {
@@ -14,17 +26,6 @@ export const THEMES: Record<GameState['venue'], Theme> = {
   gallery: { floorA: '#d9c3a0', floorB: '#cfb790', wallLeft: '#f3efe8', wallRight: '#e4ded4', wallTop: '#bdb5a8', bg: '#1d1a17' },
   museum: { floorA: '#d7d7d2', floorB: '#c9c9c3', wallLeft: '#ece6da', wallRight: '#dcd4c6', wallTop: '#a89f90', bg: '#17191c' },
 };
-
-interface Visitor {
-  x: number;
-  y: number;
-  tx: number;
-  ty: number;
-  wait: number;
-  speed: number;
-  color: string;
-  leaving?: boolean;
-}
 
 interface Floater {
   x: number;
@@ -42,12 +43,19 @@ export interface Highlight {
 
 /**
  * Draws the venue floor on a canvas and turns taps into tile coordinates.
- * It only reads GameState; it never changes it. Cosmetic visitors live here.
+ * It only reads GameState; it never changes it. Guests are drawn from their
+ * visit timelines, so they stay in step with the clock at any speed.
  */
 export class IsoRenderer {
   private ctx: CanvasRenderingContext2D;
   private state: GameState | null = null;
-  private visitors: Visitor[] = [];
+  /** Cached choreography per visit (keyed by guest + start). */
+  private timelines = new Map<string, Segment[]>();
+  /** Where each guest was drawn last frame, in canvas pixels, for tapping. */
+  private guestHits: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+  private selectedGuest: string | null = null;
+  /** Absolute game time (hours, fractional), supplied by the UI each frame. */
+  private clock: () => number = () => 0;
   private highlight: Highlight | null = null;
   private buildKind: FixtureKind | null = null;
   private hover: Pt | null = null;
@@ -66,8 +74,10 @@ export class IsoRenderer {
   constructor(
     private canvas: HTMLCanvasElement,
     private onTileTap: (x: number, y: number) => void,
+    private onGuestTap: (guestId: string) => void = () => {},
   ) {
     this.ctx = canvas.getContext('2d')!;
+    preloadSprites();
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -87,12 +97,30 @@ export class IsoRenderer {
     const first = !this.state || this.state.floor.width !== state.floor.width;
     this.state = state;
     if (first) this.pan = { x: 0, y: 0 };
-    this.syncVisitors();
+    const live = new Set(state.visits.map((v) => `${v.guestId}@${v.start}`));
+    for (const k of this.timelines.keys()) if (!live.has(k)) this.timelines.delete(k);
     this.layout();
   }
 
   setSelected(tile: Pt | null) {
     this.selected = tile;
+  }
+
+  /** Screen fractions kept clear of the room (HUD on top, dock or dialogs below). */
+  setInsets(top: number, bottom: number) {
+    if (top === this.insets.top && bottom === this.insets.bottom) return;
+    this.insets = { top, bottom };
+    this.pan = { x: 0, y: 0 };
+    this.layout();
+  }
+
+  setSelectedGuest(id: string | null) {
+    this.selectedGuest = id;
+  }
+
+  /** Where the game clock is right now, in absolute hours (see absHour). */
+  setClock(fn: () => number) {
+    this.clock = fn;
   }
 
   setHighlight(h: Highlight | null) {
@@ -109,11 +137,9 @@ export class IsoRenderer {
     this.floaters.push({ x: x + 0.5, y: y + 0.5, text, color, age: 0 });
   }
 
-  /** Is tonight's event under way? Drives the party crowd. */
+  /** Is a party on? Event guests are in the building. */
   private partyNow(): boolean {
-    const s = this.state;
-    if (!s) return false;
-    return s.events.some((e) => e.day === s.day) && s.tick >= TIME.eventTick - 2 && s.tick <= TIME.eventTick;
+    return !!this.state?.visits.some((v) => v.event);
   }
 
   // ---- layout & input ------------------------------------------------------
@@ -176,7 +202,13 @@ export class IsoRenderer {
     const drag = this.drag;
     this.drag = null;
     if (!drag || drag.moved || !this.state) return;
-    const g = this.gridAt(this.local(e));
+    const p = this.local(e);
+    // People first: front-most (last drawn) wins.
+    for (let i = this.guestHits.length - 1; i >= 0; i--) {
+      const h = this.guestHits[i];
+      if (p.x >= h.x0 && p.x <= h.x1 && p.y >= h.y0 && p.y <= h.y1) return this.onGuestTap(h.id);
+    }
+    const g = this.gridAt(p);
     if (g) this.onTileTap(g.x, g.y);
   };
 
@@ -203,78 +235,12 @@ export class IsoRenderer {
     return null;
   }
 
-  // ---- visitors (cosmetic) -------------------------------------------------
-
-  private syncVisitors() {
-    const s = this.state!;
-    const daily = getVenueModel(s.venue).expectedDailyVisitors(s);
-    const hanging = s.floor.fixtures.filter((f) => f.artworkId).length;
-    const party = this.partyNow() ? 12 : 0;
-    const want = Math.min(26, Math.round(daily / 6) + Math.min(hanging, 2) + party);
-    const palette = ['#2f3e46', '#6d597a', '#b56576', '#355070', '#e56b6f', '#283618', '#9c6644'];
-    const staying = this.visitors.filter((v) => !v.leaving);
-    // Extra people head for the door rather than vanishing.
-    for (const v of staying.slice(want)) {
-      v.leaving = true;
-      v.tx = s.floor.entrance.x + 0.5;
-      v.ty = s.floor.entrance.y + 0.5;
-    }
-    let count = Math.min(staying.length, want);
-    while (count++ < want) {
-      const { x, y } = s.floor.entrance;
-      this.visitors.push({
-        x: x + 0.5,
-        y: y + 0.5,
-        tx: x + 0.5,
-        ty: y + 0.5,
-        wait: Math.random() * 2,
-        speed: 0.6 + Math.random() * 0.5,
-        color: palette[this.visitors.length % palette.length],
-      });
-    }
-  }
-
-  private stepVisitors(dt: number) {
-    const s = this.state!;
-    const art = s.floor.fixtures.filter((f) => f.artworkId);
-    for (const v of this.visitors) {
-      const dx = v.tx - v.x;
-      const dy = v.ty - v.y;
-      const d = Math.hypot(dx, dy);
-      if (d < 0.05 && v.leaving) {
-        v.wait = -1; // reached the door
-        continue;
-      }
-      if (d < 0.05) {
-        v.wait -= dt;
-        if (v.wait <= 0) {
-          // Head for a random artwork (stand in front of it) or wander.
-          const f = art.length && Math.random() < 0.7 ? art[Math.floor(Math.random() * art.length)] : null;
-          if (f) {
-            v.tx = (f.x === 0 ? 1 : f.x) + 0.3 + Math.random() * 0.4;
-            v.ty = (f.y === 0 && f.x !== 0 ? 1 : f.y) + 0.3 + Math.random() * 0.4;
-          } else {
-            v.tx = 1 + Math.random() * (s.floor.width - 2);
-            v.ty = 1 + Math.random() * (s.floor.height - 2);
-          }
-          v.wait = 1.5 + Math.random() * 3;
-        }
-      } else {
-        const step = Math.min(d, v.speed * dt);
-        v.x += (dx / d) * step;
-        v.y += (dy / d) * step;
-      }
-    }
-    this.visitors = this.visitors.filter((v) => !(v.leaving && v.wait === -1));
-  }
-
   // ---- drawing -------------------------------------------------------------
 
   private frame = (t: number) => {
     const dt = Math.min(0.05, (t - this.last) / 1000 || 0);
     this.last = t;
     if (this.state) {
-      this.stepVisitors(dt);
       for (const f of this.floaters) f.age += dt;
       this.floaters = this.floaters.filter((f) => f.age < 1.8);
       this.draw(t);
@@ -306,7 +272,13 @@ export class IsoRenderer {
     for (const f of s.floor.fixtures) {
       if (f.kind !== 'wallHang') items.push({ depth: f.x + f.y + 1, draw: () => this.drawFixture(f) });
     }
-    for (const v of this.visitors) items.push({ depth: v.x + v.y, draw: () => this.drawVisitor(v, t) });
+    const now = this.clock();
+    this.guestHits = [];
+    for (const v of s.visits) {
+      if (now < v.start || now >= v.end) continue;
+      const pose = poseAt(this.timeline(v), now);
+      if (pose) items.push({ depth: pose.x + pose.y, draw: () => this.drawGuest(v, pose, t) });
+    }
     items.sort((a, b) => a.depth - b.depth).forEach((d) => d.draw());
 
     if (this.buildKind && this.hover) this.drawGhost(this.buildKind, this.hover);
@@ -484,29 +456,96 @@ export class IsoRenderer {
     this.poly(pts, ok ? 'rgba(80, 200, 120, 0.35)' : 'rgba(220, 60, 60, 0.35)');
   }
 
-  private drawVisitor(v: Visitor, t: number) {
+  private timeline(v: GuestVisit): Segment[] {
+    const key = `${v.guestId}@${v.start}`;
+    let segs = this.timelines.get(key);
+    if (!segs) {
+      segs = visitTimeline(v, this.state!.floor, v.event ? v.end : undefined);
+      this.timelines.set(key, segs);
+    }
+    return segs;
+  }
+
+  /** One guest: sprite frame, shadow, mood bubble, and a name tag when selected. */
+  private drawGuest(v: GuestVisit, pose: NonNullable<ReturnType<typeof poseAt>>, t: number) {
+    const s = this.state!;
+    const g = s.guests[v.guestId];
+    const meta = g && SPRITES[g.sprite];
+    if (!meta) return;
+    const img = atlas(g.sprite);
     const ctx = this.ctx;
-    const p = toScreen(v.x, v.y);
-    const moving = Math.hypot(v.tx - v.x, v.ty - v.y) > 0.05;
-    const bob = moving ? Math.sin(t / 90 + v.speed * 10) * 1.2 : 0;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    const { seg, local } = pose;
+    const [row, frames] = meta.anims[seg.anim];
+    const dur = seg.end - seg.start;
+    // Loops for walking, idling and chatting; one-shot (hold last frame) for reactions.
+    const looping = seg.anim === 'walk' || seg.anim === 'idle' || seg.anim === 'chat';
+    const perHour = seg.anim === 'walk' ? 15 : 6;
+    const frame = looping ? Math.floor(local * perHour) % frames : Math.min(frames - 1, Math.floor((local / Math.max(0.01, dur)) * frames));
+
+    const [cw, ch] = meta.cell;
+    const scale = 68 / ch;
+    const p = toScreen(pose.x, pose.y);
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, 6, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y, 11, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = v.color;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y - 11 + bob, 5, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#e9c9a8';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y - 24 + bob, 4, 0, Math.PI * 2);
-    ctx.fill();
-    if (this.partyNow()) {
-      ctx.fillStyle = '#8e1f3a';
-      ctx.fillRect(p.x + 5, p.y - 17 + bob, 3, 4);
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillRect(p.x + 6, p.y - 13 + bob, 1, 4);
+    if (img.complete && img.naturalWidth) {
+      ctx.save();
+      ctx.translate(p.x, p.y + 2);
+      if (seg.faceLeft) ctx.scale(-1, 1);
+      ctx.drawImage(img, frame * cw, row * ch, cw, ch, (-cw * scale) / 2, -ch * scale, cw * scale, ch * scale);
+      ctx.restore();
+    }
+
+    // Hit box in canvas pixels.
+    const sx = this.origin.x + this.pan.x;
+    const sy = this.origin.y + this.pan.y;
+    const k = this.scale;
+    this.guestHits.push({
+      id: g.id,
+      x0: sx + (p.x - (cw * scale) / 2) * k,
+      x1: sx + (p.x + (cw * scale) / 2) * k,
+      y0: sy + (p.y - ch * scale) * k,
+      y1: sy + (p.y + 4) * k,
+    });
+
+    // Mood bubble while reacting.
+    const top = p.y - ch * scale - 6;
+    const bubble =
+      seg.anim === 'impressed' ? { text: '♥', color: '#e2557a' } : seg.anim === 'think' ? { text: '…', color: '#8a7f73' } : seg.anim === 'disapprove' ? { text: '✕', color: '#b5483f' } : null;
+    if (bubble) {
+      const bob = Math.sin(t / 160) * 1.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(p.x + 10, top - 4 + bob, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = bubble.color;
+      ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(bubble.text, p.x + 10, top - 3.5 + bob);
+      ctx.textBaseline = 'alphabetic';
+    }
+    if (seg.anim === 'photo' && frame === 2) {
+      ctx.fillStyle = 'rgba(255,255,240,0.5)';
+      ctx.beginPath();
+      ctx.arc(p.x + (seg.faceLeft ? -8 : 8), p.y - ch * scale * 0.8, 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (this.selectedGuest === g.id) {
+      const label = shortName(g);
+      ctx.font = '700 10px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      const w = ctx.measureText(label).width + 10;
+      ctx.fillStyle = 'rgba(224,170,69,0.95)';
+      ctx.beginPath();
+      ctx.roundRect(p.x - w / 2, top - 22, w, 14, 7);
+      ctx.fill();
+      ctx.fillStyle = '#1d1508';
+      ctx.fillText(label, p.x, top - 12);
     }
   }
+
 }
 

@@ -15,6 +15,8 @@ export class Store {
   private carry = 0;
   /** Index into TIME.speeds. 0 = paused. */
   speedIndex = 1;
+  /** Off while the first-run preview is showing, so it never overwrites a real save. */
+  autosave = true;
   /** 0..1 progress through the current hour, for smooth clock hands. */
   hourProgress = 0;
 
@@ -25,10 +27,18 @@ export class Store {
     if (!res.ok) return { ok: false, error: res.error };
     const dayChanged = res.state.day !== this.state.day;
     this.state = res.state;
-    if (action.type !== 'tick' || dayChanged) saveGame(this.state);
+    if (this.autosave && (action.type !== 'tick' || dayChanged)) saveGame(this.state);
     if (this.state.status !== 'playing') this.speedIndex = 0;
     this.emit();
     return { ok: true };
+  }
+
+  /** Swap in a different game (new game, loaded save, setup preview). */
+  load(state: GameState, speedIndex = this.speedIndex) {
+    this.state = state;
+    this.speedIndex = speedIndex;
+    this.carry = 0;
+    this.emit();
   }
 
   setSpeed(i: number) {
@@ -61,7 +71,7 @@ export class Store {
 
   stop() {
     cancelAnimationFrame(this.raf);
-    saveGame(this.state);
+    if (this.autosave) saveGame(this.state);
   }
 
   subscribe(l: Listener) {

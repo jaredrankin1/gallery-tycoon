@@ -28,7 +28,8 @@ export const museumModel: VenueModel = {
         (0.3 + state.reputation / 50) *
         collectionAppeal(state) *
         priceDemand(state.settings.ticketPrice) *
-        (1 + countFixtures(state.floor, 'bench') * FIXTURE_EFFECTS.benchVisitorBonus),
+        (1 + countFixtures(state.floor, 'bench') * FIXTURE_EFFECTS.benchVisitorBonus) +
+        state.buzz * Math.min(1, collectionAppeal(state)),
     );
   },
 

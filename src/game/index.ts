@@ -11,3 +11,5 @@ export { clockLabel, weekday } from './clock';
 export { collectionAppeal, priceDemand } from './venues/museum';
 export { getVenueModel } from './venues';
 export { canPlace, fixtureAt, displayFixtures } from './systems/floor';
+export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
+export { tasteScore, reactionFor, TAG_LABEL } from './systems/taste';

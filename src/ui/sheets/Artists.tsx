@@ -1,5 +1,5 @@
 import { EVENT_KIND, relationshipLabel, RULES } from '../../game';
-import { Avatar, Meter, money, RelationshipBar, Sheet } from '../bits';
+import { Avatar, Meter, money, RelationshipBar } from '../bits';
 import { useGame } from '../context';
 import { Icon } from '../icons';
 
@@ -13,12 +13,12 @@ const TRAIT_LABEL: Record<string, string> = {
   diva: 'Diva',
 };
 
-export function ArtistsSheet() {
+/** The artist cards, shown under People → Artists. */
+export function ArtistList() {
   const { state, setUi, act, toast } = useGame();
   const artists = Object.values(state.artists);
 
   return (
-    <Sheet title="Artists" onClose={() => setUi({ sheet: null })}>
       <div class="artist-list">
         {artists.map((a) => {
           const owned = Object.values(state.artworks).filter((w) => w.artistId === a.id && (w.status === 'storage' || w.status === 'display')).length;
@@ -82,6 +82,5 @@ export function ArtistsSheet() {
           );
         })}
       </div>
-    </Sheet>
   );
 }

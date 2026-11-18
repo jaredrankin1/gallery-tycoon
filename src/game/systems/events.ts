@@ -5,6 +5,7 @@ import type { EventResult, GameState, HospitalityPlan, ScheduledEvent } from '..
 import { getVenueModel } from '../venues';
 import { adjustRelationship } from './artists';
 import { notify } from './feed';
+import { eventGuests } from './visits';
 import { post } from './ledger';
 
 export function hospitalityCost(plan: HospitalityPlan): number {
@@ -83,6 +84,7 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
     text: `${EVENT_KIND[event.kind].label}: ${attendance} came, catered for ${guests}. ${verdict}`,
   });
   for (const n of notes) notify(state, { kind: 'artist', text: n });
+  eventGuests(state, event, satisfaction, rng);
   state.today.visitors += attendance;
 
   return {

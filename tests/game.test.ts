@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createNewGame, dispatch, DIFFICULTY, TIME, type Action, type GameState } from '../src/game';
+import { createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, type Action, type GameState } from '../src/game';
 
 const run = (s: GameState, a: Action) => {
   const r = dispatch(s, a);
@@ -131,5 +131,58 @@ describe('floor', () => {
     const s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 1 });
     expect(dispatch(s, { type: 'placeFixture', kind: 'wallHang', x: 3, y: 3 }).ok).toBe(false);
     expect(dispatch(s, { type: 'placeFixture', kind: 'pedestal', x: 3, y: 3 }).ok).toBe(true);
+  });
+});
+
+describe('guests', () => {
+  const hung = (venue: 'gallery' | 'museum', seed: number) => {
+    let s = createNewGame({ name: 'x', difficulty: 'easy', venue, seed });
+    for (const w of offers(s).slice(0, 4)) {
+      s = run(s, { type: 'buyArtwork', artworkId: w.id });
+      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    }
+    return s;
+  };
+
+  it('taste follows likes and dislikes', () => {
+    const s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 1 });
+    const g = s.guests['g-edmund'];
+    const fake = (tags: string[]) => ({ ...Object.values(s.artists)[0], tags });
+    const work = { id: 'w', artistId: 'a', title: 't', value: 1000, price: 1000 } as never;
+    expect(tasteScore(g, work, fake(g.likes))).toBeGreaterThan(tasteScore(g, work, fake(g.dislikes)));
+  });
+
+  it('visit, react, and learn what they like', () => {
+    let s = hung('gallery', 3);
+    s = days(s, 14);
+    const visited = Object.values(s.guests).filter((g) => g.visits > 0);
+    expect(visited.length).toBeGreaterThan(2);
+    expect(visited.some((g) => g.knownLikes.length + g.knownDislikes.length > 0)).toBe(true);
+    expect(visited.some((g) => g.affinity !== 0)).toBe(true);
+    expect(s.feed.some((f) => f.kind === 'guest' && f.guestId)).toBe(true);
+  });
+
+  it('nobody stays overnight', () => {
+    let s = hung('gallery', 4);
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay * 3 - 1 });
+    s = run(s, { type: 'tick', hours: 1 });
+    expect(s.tick).toBe(0);
+    expect(s.visits).toHaveLength(0);
+  });
+
+  it('guest visits stay deterministic for a seed', () => {
+    const play = () => days(hung('museum', 9), 10);
+    expect(play().guests).toEqual(play().guests);
+  });
+
+  it('timelines start at the door and end back there', () => {
+    let s = hung('gallery', 5);
+    for (let i = 0; i < 40 && !s.visits.length; i++) s = run(s, { type: 'tick', hours: 1 });
+    const v = s.visits[0];
+    expect(v).toBeDefined();
+    const segs = visitTimeline(v, s.floor);
+    expect(segs[0].start).toBe(v.start);
+    expect(segs[0].from).toEqual(segs[segs.length - 1].to);
+    expect(poseAt(segs, v.start + 0.01)).not.toBeNull();
   });
 });

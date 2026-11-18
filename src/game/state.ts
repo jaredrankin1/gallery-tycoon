@@ -3,6 +3,7 @@ import { DIFFICULTY, VENUE } from './config';
 import type { Artist, Difficulty, GameState, Id, VenueType } from './types';
 import { Rng } from './rng';
 import { createFloor } from './systems/floor';
+import { GUEST_SEEDS } from '../data/guests';
 import { refreshMarket } from './systems/market';
 import { emptyDay } from './clock';
 import { RULES } from './config';
@@ -22,7 +23,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
   }
 
   const state: GameState = {
-    version: 2,
+    version: 3,
     name: opts.name.trim() || (opts.venue === 'museum' ? 'The New Museum' : 'Untitled Gallery'),
     difficulty: opts.difficulty,
     venue: opts.venue,
@@ -35,6 +36,11 @@ export function createNewGame(opts: NewGameOptions): GameState {
     artists,
     artworks: {},
     floor: createFloor(opts.venue),
+    guests: Object.fromEntries(
+      GUEST_SEEDS.map((g) => [g.id, { ...g, affinity: 0, visits: 0, lastVisitDay: 0, knownLikes: [], knownDislikes: [] }]),
+    ),
+    visits: [],
+    buzz: 0,
     events: [],
     ledger: [],
     today: emptyDay(1),

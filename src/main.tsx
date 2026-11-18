@@ -1,34 +1,41 @@
 import { render } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { clearSave, createNewGame, loadGame, type GameState } from './game';
+import { createNewGame, saveGame } from './game';
 import './styles.css';
 import { Game } from './ui/Game';
+import { PREVIEW_SEED } from './ui/Onboarding';
 import { Store } from './ui/store';
-import { Title } from './ui/Title';
+
+/** The empty room you see behind the first-run questions. */
+const preview = () => createNewGame({ name: '', difficulty: 'normal', venue: 'gallery', seed: PREVIEW_SEED });
 
 function App() {
-  const [game, setGame] = useState<GameState | null>(null);
-  const store = useMemo(() => (game ? new Store(game) : null), [game]);
+  const store = useMemo(() => {
+    const s = new Store(preview());
+    s.speedIndex = 0;
+    s.autosave = false;
+    return s;
+  }, []);
+  const [onboarding, setOnboarding] = useState(true);
 
   useEffect(() => {
-    if (!store) return;
     store.start();
     return () => store.stop();
   }, [store]);
 
-  if (!store) {
-    return (
-      <Title
-        canContinue={!!loadGame()}
-        onContinue={() => setGame(loadGame())}
-        onStart={(c) => {
-          clearSave();
-          setGame(createNewGame(c));
-        }}
-      />
-    );
-  }
-  return <Game key={game!.name + game!.rng} store={store} onQuit={() => setGame(null)} />;
+  return (
+    <Game
+      store={store}
+      onboarding={onboarding}
+      onSetupDone={() => setOnboarding(false)}
+      onQuit={() => {
+        saveGame(store.state);
+        store.autosave = false;
+        store.load(preview(), 0);
+        setOnboarding(true);
+      }}
+    />
+  );
 }
 
 render(<App />, document.getElementById('app')!);

@@ -1,10 +1,11 @@
-import { DIFFICULTY, RULES, TIME, VENUE } from './config';
+import { DIFFICULTY, GUESTS, RULES, TIME, VENUE } from './config';
 import type { Rng } from './rng';
 import { endOfDayArtists } from './systems/artists';
 import { resolveEvent } from './systems/events';
 import { notify } from './systems/feed';
 import { post } from './systems/ledger';
 import { refreshMarket } from './systems/market';
+import { closeForTheNight, hourOfGuests } from './systems/visits';
 import type { DayReport, GameState } from './types';
 import { getVenueModel } from './venues';
 
@@ -33,6 +34,7 @@ export function stepHour(state: GameState, rng: Rng): void {
   const venue = getVenueModel(state.venue);
 
   state.today.visitors += venue.hour(state, rng);
+  hourOfGuests(state, rng);
 
   if (state.tick === TIME.eventTick) {
     const tonight = state.events.filter((e) => e.day === state.day);
@@ -61,6 +63,8 @@ function endOfDay(state: GameState, rng: Rng): void {
   }
 
   endOfDayArtists(state);
+  closeForTheNight(state, rng);
+  state.buzz *= GUESTS.buzzDecay;
 
   state.history.push(state.today);
   if (state.history.length > RULES.historyDays) state.history.shift();

@@ -3,7 +3,7 @@ import { useContext } from 'preact/hooks';
 import type { Action, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from '../game';
 import type { Store } from './store';
 
-export type SheetId = 'collection' | 'artists' | 'events' | 'books';
+export type SheetId = 'collection' | 'people' | 'events' | 'books';
 /** 'remove' is the bulldozer tool in the build tray. */
 export type BuildTool = FixtureKind | 'remove';
 
@@ -22,6 +22,12 @@ export interface Ui {
   building: boolean;
   selected: { x: number; y: number } | null;
   draft: EventDraft | null;
+  /** Guest tapped on the floor (shows their card). */
+  guest: string | null;
+  /** Which list the People sheet shows. */
+  peopleTab: 'guests' | 'artists';
+  /** First-run tip pointing at the Art button. */
+  coach: boolean;
 }
 
 export interface GameCtx {

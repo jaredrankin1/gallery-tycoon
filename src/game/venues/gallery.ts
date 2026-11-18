@@ -23,7 +23,8 @@ function saleChance(state: GameState, work: Artwork, boost: number): number {
   );
 }
 
-function sell(state: GameState, work: Artwork, where: string): void {
+/** Sells a work off the floor. `guestId` names the buyer when it's one of the regulars. */
+export function sellArtwork(state: GameState, work: Artwork, where: string, guestId?: string): void {
   const spot = state.floor.fixtures.find((f) => f.artworkId === work.id);
   work.status = 'sold';
   work.day = state.day;
@@ -32,7 +33,8 @@ function sell(state: GameState, work: Artwork, where: string): void {
   state.today.sales += 1;
   notify(state, {
     kind: 'sale',
-    text: `Sold “${work.title}” for $${work.price.toLocaleString('en-US')}`,
+    guestId,
+    text: `Sold “${work.title}” ${where.startsWith('to ') ? where + ' ' : ''}for $${work.price.toLocaleString('en-US')}`,
     amount: work.price,
     at: spot ? { x: spot.x, y: spot.y } : undefined,
   });
@@ -48,13 +50,13 @@ export const galleryModel: VenueModel = {
 
   expectedDailyVisitors(state) {
     return Math.round(
-      (5 + displayed(state).length * 1.5) * (0.5 + state.reputation / 50) * DIFFICULTY[state.difficulty].demandMultiplier,
+      (5 + displayed(state).length * 1.5) * (0.5 + state.reputation / 50) * DIFFICULTY[state.difficulty].demandMultiplier + state.buzz,
     );
   },
 
   hour(state, rng) {
     for (const work of displayed(state)) {
-      if (rng.chance(saleChance(state, work, 1) / TIME.ticksPerDay)) sell(state, work, 'off the floor');
+      if (rng.chance(saleChance(state, work, 1) / TIME.ticksPerDay)) sellArtwork(state, work, 'off the floor');
     }
     const exp = galleryModel.expectedDailyVisitors(state) / TIME.ticksPerDay;
     return Math.floor(exp + rng.next());
@@ -67,7 +69,7 @@ export const galleryModel: VenueModel = {
     for (const work of displayed(state)) {
       const featured = event.featuredArtistIds.includes(work.artistId);
       if (rng.chance(saleChance(state, work, featured ? boost * 1.5 : boost * 0.5))) {
-        sell(state, work, `at the ${event.kind}`);
+        sellArtwork(state, work, `at the ${event.kind}`);
         soldArtworkIds.push(work.id);
       }
     }
