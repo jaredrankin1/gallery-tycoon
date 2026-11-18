@@ -4,7 +4,7 @@ import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, Sched
 import { sellArtwork } from '../venues/gallery';
 import { notify } from './feed';
 import { post } from './ledger';
-import { hash01, moodOf, reactionFor, tasteScore } from './taste';
+import { hash01, moodOf, reactionFor, tasteScore, workTags } from './taste';
 
 /** Absolute game hour: hours since day 1 opened. */
 export const absHour = (state: Pick<GameState, 'day' | 'tick'>) => (state.day - 1) * TIME.ticksPerDay + state.tick;
@@ -184,7 +184,8 @@ export function closeForTheNight(state: GameState, rng: Rng): void {
 
 function learn(state: GameState, g: Guest, steps: VisitStep[]) {
   for (const s of steps) {
-    const tags = state.artists[state.artworks[s.artworkId]?.artistId]?.tags ?? [];
+    const work = state.artworks[s.artworkId];
+    const tags = workTags(work, state.artists[work?.artistId]);
     if (s.reaction === 'impressed') {
       const t = tags.find((t) => g.likes.includes(t) && !g.knownLikes.includes(t));
       if (t) g.knownLikes.push(t);

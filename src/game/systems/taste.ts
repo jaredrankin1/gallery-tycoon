@@ -11,10 +11,16 @@ export function hash01(s: string): number {
   return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 
+/** What a work is like: its artist's tags plus its own. */
+export function workTags(work: Artwork | undefined, artist: Artist | undefined): string[] {
+  const own = work?.tags ?? [];
+  return [...(artist?.tags ?? []), ...own.filter((t) => !artist?.tags.includes(t))];
+}
+
 /** How much this guest likes this work, 0..1. Pure: no randomness beyond a stable per-pair hash. */
 export function tasteScore(guest: Guest, work: Artwork, artist: Artist | undefined): number {
   let s = 0.42;
-  for (const t of artist?.tags ?? []) {
+  for (const t of workTags(work, artist)) {
     if (guest.likes.includes(t)) s += 0.16;
     if (guest.dislikes.includes(t)) s -= 0.2;
   }
@@ -54,4 +60,10 @@ export const TAG_LABEL: Record<string, string> = {
   installation: 'installation',
   minimal: 'minimalism',
   prestige: 'big names',
+  geometric: 'geometry',
+  retro: 'retro style',
+  print: 'prints',
+  weird: 'the weird stuff',
+  illustration: 'illustration',
+  fantasy: 'fantasy',
 };

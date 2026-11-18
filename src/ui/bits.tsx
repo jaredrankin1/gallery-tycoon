@@ -2,6 +2,7 @@
 import type { ComponentChildren } from 'preact';
 import { relationshipLabel, type Artist, type Artwork } from '../game';
 import { hueOf } from '../render/iso';
+import { paintingUrl } from '../render/paintings';
 import { Icon } from './icons';
 
 export const money = (n: number) => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
@@ -14,7 +15,14 @@ export const shortMoney = (n: number) => {
 };
 
 /** Procedural painting thumbnail that matches what hangs on the floor. */
-export function ArtThumb({ work, size = 'md' }: { work: Pick<Artwork, 'id'>; size?: 'sm' | 'md' | 'lg' }) {
+export function ArtThumb({ work, size = 'md' }: { work: Pick<Artwork, 'id' | 'image'>; size?: 'sm' | 'md' | 'lg' }) {
+  const src = work.image && paintingUrl(work.image);
+  if (src)
+    return (
+      <span class={`thumb ${size} img`}>
+        <img src={src} alt="" loading="lazy" />
+      </span>
+    );
   const h = hueOf(work.id);
   return (
     <span class={`thumb ${size}`} style={{ '--h': h, '--h2': (h + 140) % 360 }}>

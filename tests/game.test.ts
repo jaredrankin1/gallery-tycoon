@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, type Action, type GameState } from '../src/game';
+import { createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, workTags, type Action, type GameState } from '../src/game';
 
 const run = (s: GameState, a: Action) => {
   const r = dispatch(s, a);
@@ -184,5 +184,21 @@ describe('guests', () => {
     expect(segs[0].start).toBe(v.start);
     expect(segs[0].from).toEqual(segs[segs.length - 1].to);
     expect(poseAt(segs, v.start + 0.01)).not.toBeNull();
+  });
+});
+
+describe('paintings', () => {
+  it('market offers real, unique paintings with their own tags', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 2 });
+    const seen: string[] = [];
+    for (let d = 0; d < 20; d++) {
+      const imgs = offers(s).map((w) => w.image).filter(Boolean) as string[];
+      expect(new Set(imgs).size).toBe(imgs.length);
+      seen.push(...imgs);
+      s = days(s, 1);
+    }
+    expect(new Set(seen).size).toBeGreaterThan(15);
+    const tagged = Object.values(s.artworks).find((w) => w.tags?.length);
+    if (tagged) expect(workTags(tagged, s.artists[tagged.artistId])).toEqual(expect.arrayContaining(tagged.tags!));
   });
 });

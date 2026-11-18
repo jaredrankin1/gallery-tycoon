@@ -45,6 +45,10 @@ export interface Artwork {
   status: ArtworkStatus;
   /** Day an offer expires, or the day it was acquired/sold. */
   day: number;
+  /** Painting image key (src/assets/art). Missing = drawn procedurally (sculpture, installation). */
+  image?: string;
+  /** Extra tags for this one work, on top of the artist's. */
+  tags?: string[];
 }
 
 export type EventKind = 'opening' | 'reception' | 'talk' | 'gala';

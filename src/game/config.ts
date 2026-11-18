@@ -121,8 +121,8 @@ export const RULES = {
   /** Offers on the market at once. */
   marketSize: 5,
   /** New offers that appear per day (when there is room). */
-  newOffersPerDay: 1,
-  offerLifetimeDays: 5,
+  newOffersPerDay: 2,
+  offerLifetimeDays: 3,
   /** Relationship needed before an artist offers you works directly. */
   relationshipForOffers: 20,
   /** Days without contact before an artist starts to feel neglected. */

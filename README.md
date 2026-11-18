@@ -28,7 +28,7 @@ The game runs in real time. A day lasts about 20 seconds at normal speed, and
 you can pause or play at 1x, 2x or 4x from the top bar. Doors open at 10 AM
 and each hour is one simulation step.
 
-- **Art**: buy works that turn up on the market each day. Artists who like you offer more often and give a discount.
+- **Art**: buy works that turn up on the market each day. There are 40 real paintings across seven painters, plus sculpture and installation pieces. Artists who like you offer more often and give a discount.
 - **Floor**: tap a wall spot or pedestal to hang art, set its price (gallery) or take it down. Tap a painting on the wall to inspect it.
 - **Build**: wall spots, pedestals, a wine bar, benches and plants on the isometric grid, with a live placement preview.
 - **Visitors**: eight named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
@@ -67,10 +67,12 @@ src/
       gallery.ts        Hourly sale rolls off the floor, and sales at events
       museum.ts         Ticket sales, collection appeal, price demand
   data/artists.ts       Artist personas (with style tags) and artwork title parts
+  data/paintings.ts     The painting catalogue: image, title, artist, extra style tags
   data/guests.ts        Visitor characters: role, tastes, budget, traits, lines
   render/
     iso.ts              Isometric projection math (grid <-> screen)
     IsoRenderer.ts      Canvas renderer: walls, floor, fixtures, art, animated visitors, tap targets
+    paintings.ts        Painting images (built by tools/slice_art.py)
     sprites.ts          Sprite atlases and portraits (built by tools/slice_sprites.py)
   ui/                   Preact UI
     store.ts            Holds the game, runs the real-time clock, autosaves
@@ -91,7 +93,8 @@ tests/game.test.ts      Logic tests
 - **New venue type**: implement `VenueModel` in `venues/` and register it in `venues/index.ts`.
 - **Balance**: almost everything is in `config.ts`.
 - **New visitor**: drop a sprite sheet in `art/source/`, run `python3 tools/slice_sprites.py`, and add a seed to `src/data/guests.ts`.
-- **Art**: rooms and paintings are procedural; characters come from the sheets in `art/source/`.
+- **New painting**: add a card sheet to `art/source/paintings/`, run `python3 tools/slice_art.py`, and list each work in `src/data/paintings.ts`.
+- **Art**: rooms and sculpture are procedural; paintings and characters come from the sheets in `art/source/`.
 
 ## Design rules
 

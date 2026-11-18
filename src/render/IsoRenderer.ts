@@ -11,6 +11,7 @@ import {
   type Segment,
 } from '../game';
 import { atlas, preloadSprites, SPRITES } from './sprites';
+import { paintingImage, preloadPaintings } from './paintings';
 import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
 
 export interface Theme {
@@ -78,6 +79,7 @@ export class IsoRenderer {
   ) {
     this.ctx = canvas.getContext('2d')!;
     preloadSprites();
+    preloadPaintings();
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
     canvas.addEventListener('pointerdown', this.onDown);
@@ -357,10 +359,10 @@ export class IsoRenderer {
   /** A framed picture on the back wall above tile (f.x, f.y). */
   private drawWallHang(f: Fixture) {
     const onLeft = f.x === 0;
-    const a = onLeft ? toScreen(0, f.y + 0.18) : toScreen(f.x + 0.18, 0);
-    const b = onLeft ? toScreen(0, f.y + 0.82) : toScreen(f.x + 0.82, 0);
-    const lo = 22;
-    const hi = 66;
+    const a = onLeft ? toScreen(0, f.y + 0.08) : toScreen(f.x + 0.08, 0);
+    const b = onLeft ? toScreen(0, f.y + 0.92) : toScreen(f.x + 0.92, 0);
+    const lo = 18;
+    const hi = 72;
     const quad = (inset: number) => [
       { x: a.x + (b.x - a.x) * inset, y: a.y + (b.y - a.y) * inset - lo - inset * 20 },
       { x: b.x - (b.x - a.x) * inset, y: b.y - (b.y - a.y) * inset - lo - inset * 20 },
@@ -374,10 +376,30 @@ export class IsoRenderer {
       ctx.setLineDash([]);
       return;
     }
-    const hue = hueOf(f.artworkId);
     this.poly(quad(0), '#b08d57', '#6e5530');
+    const img = this.imageFor(f.artworkId);
+    if (img) {
+      // Map the image onto the wall: u runs along the wall, v straight down.
+      const q = quad(0.07);
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.transform((q[2].x - q[3].x) / img.width, (q[2].y - q[3].y) / img.width, (q[0].x - q[3].x) / img.height, (q[0].y - q[3].y) / img.height, q[3].x, q[3].y);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+      // A little shade so the far wall reads as further away.
+      if (!onLeft) this.poly(q, 'rgba(0,0,0,0.08)');
+      return;
+    }
+    const hue = hueOf(f.artworkId);
     this.poly(quad(0.1), `hsl(${hue} 45% 55%)`);
     this.poly(quad(0.3), `hsl(${(hue + 140) % 360} 55% 40%)`);
+  }
+
+  /** The loaded image for a painting, or null for sculpture or while it loads. */
+  private imageFor(artworkId: string): HTMLImageElement | null {
+    const key = this.state?.artworks[artworkId]?.image;
+    const img = key ? paintingImage(key) : null;
+    return img && img.complete && img.naturalWidth ? img : null;
   }
 
   private box(x: number, y: number, h: number, top: string, left: string, right: string, inset = 0.15) {
@@ -396,7 +418,24 @@ export class IsoRenderer {
     switch (f.kind) {
       case 'pedestal': {
         this.box(f.x, f.y, 26, '#ffffff', '#dcdcdc', '#c4c4c4', 0.25);
-        if (f.artworkId) {
+        const img = f.artworkId ? this.imageFor(f.artworkId) : null;
+        if (img) {
+          // A painting on a pedestal sits on a small easel, facing you.
+          const c = toScreen(f.x + 0.5, f.y + 0.5, 26);
+          const h = 34;
+          const w = (h * img.width) / img.height;
+          ctx.strokeStyle = '#6e5530';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(c.x - w / 2, c.y);
+          ctx.lineTo(c.x - 2, c.y - h - 2);
+          ctx.moveTo(c.x + w / 2, c.y);
+          ctx.lineTo(c.x + 2, c.y - h - 2);
+          ctx.stroke();
+          ctx.fillStyle = '#b08d57';
+          ctx.fillRect(c.x - w / 2 - 1.5, c.y - h - 5.5, w + 3, h + 3);
+          ctx.drawImage(img, c.x - w / 2, c.y - h - 4, w, h);
+        } else if (f.artworkId) {
           const hue = hueOf(f.artworkId);
           const c = toScreen(f.x + 0.5, f.y + 0.5, 26);
           ctx.fillStyle = `hsl(${hue} 50% 45%)`;
