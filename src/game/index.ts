@@ -12,4 +12,5 @@ export { collectionAppeal, priceDemand } from './venues/museum';
 export { getVenueModel } from './venues';
 export { canPlace, fixtureAt, displayFixtures } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
+export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
 export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';

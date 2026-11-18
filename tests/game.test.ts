@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, workTags, type Action, type GameState } from '../src/game';
+import { assistantPose, createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, workTags, type Action, type GameState } from '../src/game';
 
 const run = (s: GameState, a: Action) => {
   const r = dispatch(s, a);
@@ -241,5 +241,23 @@ describe('closing time', () => {
       expect(last.to).toEqual({ x: s.floor.entrance.x + 0.5, y: s.floor.entrance.y + 0.5 });
     }
     expect(s.feed.some((f) => f.text.startsWith('Closing time'))).toBe(true);
+  });
+});
+
+describe('gallery assistant', () => {
+  it('works the floor during the day and waves people out at closing', () => {
+    const s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 3 });
+    const anims = new Set<string>();
+    for (let h = 0; h < TIME.closingTick; h += 0.1) {
+      const p = assistantPose(s, h);
+      expect(p.x).toBeGreaterThan(0);
+      expect(p.y).toBeGreaterThan(0);
+      expect(p.x).toBeLessThan(s.floor.width);
+      expect(p.y).toBeLessThan(s.floor.height);
+      anims.add(p.anim);
+    }
+    expect(anims.size).toBeGreaterThan(2);
+    expect(assistantPose(s, 4.2)).toEqual(assistantPose(s, 4.2));
+    expect(assistantPose(s, TIME.closingTick + 1.5).anim).toBe('wave');
   });
 });

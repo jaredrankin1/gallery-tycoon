@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { absHour, canPlace, clockLabel, fixtureAt, TIME, VENUE, weekday, type Action } from '../game';
+import { ASSISTANT, absHour, canPlace, clockLabel, fixtureAt, TIME, VENUE, weekday, type Action } from '../game';
 import { IsoRenderer } from '../render/IsoRenderer';
 import { shortMoney } from './bits';
 import { BuildTray } from './BuildTray';
@@ -225,8 +225,8 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
         {ui.guest && !ui.building && !ui.sheet && <GuestCard id={ui.guest} />}
         {ui.coach && !ui.sheet && !ui.building && (
           <div class="coach">
-            <img src={portraitUrl('theo')} alt="" />
-            <p>Walls look bare. Tap <b>Art</b> below and buy your first piece, then tap a wall spot to hang it.</p>
+            <img src={portraitUrl(ASSISTANT.sprite)} alt="" />
+            <p>Walls look bare, boss. Tap <b>Art</b> below to buy our first piece, then tap a wall spot and I’ll hang it.</p>
             <button class="icon-btn" onClick={() => setUi({ coach: false })} aria-label="Dismiss">
               <Icon name="close" size={16} />
             </button>

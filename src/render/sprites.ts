@@ -2,11 +2,11 @@
 // Each atlas has one row per animation; every cell is the same size with the
 // character's feet on the bottom edge, facing right.
 import meta from '../assets/sprites/sprites.json';
-import type { GuestAnim } from '../game';
 
 export interface SpriteMeta {
   cell: [number, number];
-  anims: Record<GuestAnim, [row: number, frames: number]>;
+  /** Animation name (a GuestAnim for visitors; the assistant has her own) -> atlas row and frame count. */
+  anims: Record<string, [row: number, frames: number]>;
 }
 
 export const SPRITES = meta as unknown as Record<string, SpriteMeta>;

@@ -70,9 +70,22 @@ FRAMES = {
         'notes': [(237, 610), (337, 610), (450, 610), (575, 610)],
         'chat': [(1100, 790), (1240, 790)],
     },
+    # The gallery assistant is staff, not a visitor: her own set of animations.
+    'assistant': {
+        'idle': [(52, 405), (125, 405), (200, 405), (275, 405)],
+        'walk': [(385, 405), (495, 405), (605, 405), (715, 405), (825, 405), (935, 405)],
+        'clipboard': [(68, 578), (205, 578), (343, 578), (480, 578), (620, 578)],
+        'dust': [(615, 750)],
+        'wave': [(1000, 575), (1250, 575)],
+        'point': [(1420, 575)],
+        'cheer': [(1450, 750)],
+        'radio': [(740, 580)],
+        'crossed': [(1130, 575)],
+        'look': [(875, 575)],
+    },
 }
 # (left, top, side) of the square portrait crop.
-PORTRAIT = {'sunny': (12, 10, 300), 'beatrix': (12, 24, 300), 'kofi': (8, 10, 296), 'hana': (14, 14, 268)}
+PORTRAIT = {'sunny': (12, 10, 300), 'beatrix': (12, 24, 300), 'kofi': (8, 10, 296), 'hana': (14, 14, 268), 'assistant': (10, 6, 300)}
 
 
 def figures(name):
@@ -110,12 +123,13 @@ def frame_at(rgb, lab, sizes, boxes, pt):
 def build(name):
     rgb, lab, sizes, boxes = figures(name)
     frames = {a: [frame_at(rgb, lab, sizes, boxes, p) for p in pts] for a, pts in FRAMES[name].items()}
+    order = ORDER if set(frames) == set(ORDER) else list(frames)
     all_f = [f for fs in frames.values() for f in fs]
     cw = max(f.width for f in all_f)
     ch = max(f.height for f in all_f)
-    cols = max(len(frames[k]) for k in ORDER)
-    sheet = Image.new('RGBA', (cw * cols, ch * len(ORDER)), (0, 0, 0, 0))
-    for r, anim in enumerate(ORDER):
+    cols = max(len(frames[k]) for k in order)
+    sheet = Image.new('RGBA', (cw * cols, ch * len(order)), (0, 0, 0, 0))
+    for r, anim in enumerate(order):
         for c, f in enumerate(frames[anim]):
             a = np.asarray(f)[:, :, 3] > 0
             lower = a[int(f.height * 0.66):]
@@ -123,7 +137,7 @@ def build(name):
             cx = int((xs[0] + xs[-1]) / 2) if len(xs) else f.width // 2
             sheet.paste(f, (c * cw + cw // 2 - cx, r * ch + ch - f.height), f)
     out_w, out_h = int(cw * SCALE), int(ch * SCALE)
-    sheet = sheet.resize((out_w * cols, out_h * len(ORDER)), Image.LANCZOS)
+    sheet = sheet.resize((out_w * cols, out_h * len(order)), Image.LANCZOS)
     arr = np.asarray(sheet).copy()
     arr[:, :, 3] = np.where(arr[:, :, 3] > 110, 255, 0)
     Image.fromarray(arr, 'RGBA').quantize(128, method=Image.Quantize.FASTOCTREE).save(os.path.join(OUT, f'{name}.png'), optimize=True)
@@ -131,14 +145,15 @@ def build(name):
     Image.fromarray(rgb).crop((l, t, l + side, t + side)).resize((96, 96), Image.LANCZOS).quantize(128).save(
         os.path.join(OUT, f'{name}-portrait.png'), optimize=True
     )
-    return {'cell': [out_w, out_h], 'anims': {k: [r, len(frames[k])] for r, k in enumerate(ORDER)}}
+    return {'cell': [out_w, out_h], 'anims': {k: [r, len(frames[k])] for r, k in enumerate(order)}}
 
 
 if __name__ == '__main__':
+    import sys
     path = os.path.join(OUT, 'sprites.json')
     with open(path) as fh:
         meta = json.load(fh)
-    for n in FRAMES:
+    for n in sys.argv[1:] or FRAMES:
         meta[n] = build(n)
         print(n, meta[n]['cell'])
     with open(path, 'w') as fh:

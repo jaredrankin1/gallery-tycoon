@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { clearSave, createNewGame, DIFFICULTY, loadGame, saveGame, VENUE, type Difficulty, type VenueType } from '../game';
+import { ASSISTANT, clearSave, createNewGame, DIFFICULTY, loadGame, saveGame, VENUE, type Difficulty, type VenueType } from '../game';
 import { portraitUrl } from '../render/sprites';
 import { money } from './bits';
 import { useGame } from './context';
@@ -21,7 +21,7 @@ const NAMES: Record<VenueType, string[]> = {
 type Step = 'welcome-back' | 'venue' | 'money' | 'name';
 
 /**
- * First run, told over the live room: Theo (a regular) walks you through
+ * First run, told over the live room: Marisol, your gallery assistant, walks you through
  * one choice at a time, and the room behind updates as you pick.
  */
 export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
@@ -62,10 +62,10 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
 
       <div class="onboard-card" key={step}>
         <div class="speaker">
-          <img src={portraitUrl('theo')} alt="" />
+          <img src={portraitUrl(ASSISTANT.sprite)} alt="" />
           <div>
-            <b>Theo</b>
-            <small class="muted">Your first regular</small>
+            <b>{ASSISTANT.name}</b>
+            <small class="muted">{ASSISTANT.title}</small>
           </div>
           {at >= 0 && (
             <span class="dots">
@@ -79,7 +79,7 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
         {step === 'welcome-back' && save && (
           <>
             <p class="line">
-              Back already? <b>{save.name}</b> is right where you left it: day {save.day}, {money(save.cash)} in the bank.
+              Welcome back, boss. <b>{save.name}</b> is right where you left it: day {save.day}, {money(save.cash)} in the bank.
             </p>
             <button
               class="btn primary wide big"
@@ -99,7 +99,7 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
 
         {step === 'venue' && (
           <>
-            <p class="line">So this is the place. Bare walls, good light. What's it going to be?</p>
+            <p class="line">Hi boss, I’m Marisol. I’ll be running the floor for you. So: bare walls, good light. What are we opening?</p>
             <div class="choices">
               {(Object.keys(VENUE) as VenueType[]).map((v) => (
                 <button class={`choice ${venue === v ? 'on' : ''}`} onClick={() => preview(v, difficulty)}>
@@ -116,7 +116,7 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
 
         {step === 'money' && (
           <>
-            <p class="line">Art isn't cheap, and neither is the wine. How are you paying for all this?</p>
+            <p class="line">Art isn’t cheap, and neither is the wine. How are we paying for all this?</p>
             <div class="choices">
               {MONEY.map((m) => (
                 <button class={`choice ${difficulty === m.id ? 'on' : ''}`} onClick={() => preview(venue, m.id)}>
@@ -136,7 +136,7 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
 
         {step === 'name' && (
           <>
-            <p class="line">Last thing. People need something to put on the invitations. What's it called?</p>
+            <p class="line">Last thing. I need something to put on the invitations. What’s it called?</p>
             <input
               class="name-input"
               value={name}

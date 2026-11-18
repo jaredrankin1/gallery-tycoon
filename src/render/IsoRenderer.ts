@@ -1,9 +1,11 @@
 import {
+  assistantPose,
   canPlace,
   poseAt,
   shortName,
   TIME,
   visitTimeline,
+  type AssistantPose,
   type Fixture,
   type FixtureKind,
   type GameState,
@@ -61,6 +63,8 @@ export class IsoRenderer {
   private onCount: (n: number) => void = () => {};
   private lastCount = -1;
   private guestCount = 0;
+  /** Real-time ms until which the assistant is cheering. */
+  private cheerUntil = 0;
   private highlight: Highlight | null = null;
   private buildKind: FixtureKind | null = null;
   private hover: Pt | null = null;
@@ -145,6 +149,8 @@ export class IsoRenderer {
   /** Floating "+$12,400" style label rising from a tile. */
   pop(x: number, y: number, text: string, color = '#f2c14e') {
     this.floaters.push({ x: x + 0.5, y: y + 0.5, text, color, age: 0 });
+    // Marisol celebrates every sale.
+    this.cheerUntil = performance.now() + 1800;
   }
 
   /** Is a party on? Event guests are in the building. */
@@ -291,6 +297,9 @@ export class IsoRenderer {
       const pose = poseAt(this.timeline(v), now);
       if (pose) items.push({ depth: pose.x + pose.y, draw: () => this.drawGuest(v, pose, t) });
     }
+    const staff = assistantPose(s, now);
+    if (performance.now() < this.cheerUntil && staff.anim !== 'walk') staff.anim = 'cheer';
+    items.push({ depth: staff.x + staff.y, draw: () => this.drawAssistant(staff) });
     if (this.guestCount !== this.lastCount) {
       this.lastCount = this.guestCount;
       this.onCount(this.guestCount);
@@ -517,6 +526,29 @@ export class IsoRenderer {
       this.timelines.set(key, segs);
     }
     return segs;
+  }
+
+  /** Marisol, the gallery assistant. Staff: not counted, not tappable. */
+  private drawAssistant(p: AssistantPose) {
+    const meta = SPRITES.assistant;
+    const img = crowdAtlas('assistant', 0);
+    if (!meta || !img) return;
+    const [row, frames] = meta.anims[p.anim] ?? meta.anims.idle;
+    const perHour = p.anim === 'walk' ? 15 : 5;
+    const frame = Math.floor(p.local * perHour) % frames;
+    const [cw, ch] = meta.cell;
+    const scale = 68 / ch;
+    const pt = toScreen(p.x, p.y);
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(pt.x, pt.y, 11, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(pt.x, pt.y + 2);
+    if (p.faceLeft) ctx.scale(-1, 1);
+    ctx.drawImage(img, frame * cw, row * ch, cw, ch, (-cw * scale) / 2, -ch * scale, cw * scale, ch * scale);
+    ctx.restore();
   }
 
   /** One guest: sprite frame, shadow, mood bubble, and a name tag when selected. */
