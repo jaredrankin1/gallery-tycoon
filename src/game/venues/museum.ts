@@ -1,6 +1,7 @@
-import { DIFFICULTY, FIXTURE_EFFECTS, RULES } from '../config';
-import { countFixtures } from '../systems/floor';
+import { DIFFICULTY, FIXTURE_EFFECTS, RULES, TIME } from '../config';
 import { clamp } from '../rng';
+import { notify } from '../systems/feed';
+import { countFixtures } from '../systems/floor';
 import { post } from '../systems/ledger';
 import type { GameState } from '../types';
 import type { VenueModel } from './types';
@@ -20,31 +21,37 @@ export function priceDemand(ticketPrice: number): number {
 export const museumModel: VenueModel = {
   canSell: false,
 
-  weekly(state, rng) {
-    const appeal = collectionAppeal(state);
-    const visitors = Math.round(
+  expectedDailyVisitors(state) {
+    return Math.round(
       RULES.museumBaseVisitors *
         DIFFICULTY[state.difficulty].demandMultiplier *
         (0.3 + state.reputation / 50) *
-        appeal *
+        collectionAppeal(state) *
         priceDemand(state.settings.ticketPrice) *
-        (1 + countFixtures(state.floor, 'bench') * FIXTURE_EFFECTS.benchVisitorBonus) *
-        rng.range(0.85, 1.15),
+        (1 + countFixtures(state.floor, 'bench') * FIXTURE_EFFECTS.benchVisitorBonus),
     );
+  },
+
+  hour(state, rng) {
+    const exp = museumModel.expectedDailyVisitors(state) / TIME.ticksPerDay;
+    const visitors = Math.floor(exp * rng.range(0.8, 1.2) + rng.next());
     if (visitors > 0 && state.settings.ticketPrice > 0) {
-      post(state, 'tickets', visitors * state.settings.ticketPrice, `${visitors} visitors`);
+      post(state, 'tickets', visitors * state.settings.ticketPrice, 'Ticket sales', true);
     }
     // A strong permanent collection slowly builds prestige.
-    state.reputation = clamp(state.reputation + Math.min(appeal, 6) * 0.1, 0, 100);
-    const notes = appeal === 0 ? ['Nobody buys a ticket to look at empty walls. Hang some art.'] : [];
-    return { visitors, soldArtworkIds: [], notes };
+    const gain = (Math.min(collectionAppeal(state), 6) * 0.015) / TIME.ticksPerDay;
+    state.reputation = clamp(state.reputation + gain, 0, 100);
+    return visitors;
   },
 
   onEvent(state, event, attendance) {
     // Event guests pay at the door, galas at a premium.
     const perHead = event.kind === 'gala' ? state.settings.ticketPrice * 4 : state.settings.ticketPrice;
     const income = attendance * perHead;
-    if (income > 0) post(state, 'tickets', income, `Door at the ${event.kind}`);
+    if (income > 0) {
+      post(state, 'tickets', income, `Door at the ${event.kind}`);
+      notify(state, { kind: 'tickets', text: `Door takings: $${income.toLocaleString('en-US')}`, amount: income });
+    }
     return { income, soldArtworkIds: [] };
   },
 };

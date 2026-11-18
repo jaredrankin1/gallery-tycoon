@@ -1,5 +1,5 @@
-import type { Fixture, GameState } from '../game';
-import { hueOf, roomBounds, toGrid, toScreen, WALL_H, type Pt } from './iso';
+import { canPlace, getVenueModel, TIME, type Fixture, type FixtureKind, type GameState } from '../game';
+import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
 
 export interface Theme {
   floorA: string;
@@ -23,6 +23,15 @@ interface Visitor {
   wait: number;
   speed: number;
   color: string;
+  leaving?: boolean;
+}
+
+interface Floater {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  age: number;
 }
 
 export interface Highlight {
@@ -40,6 +49,9 @@ export class IsoRenderer {
   private state: GameState | null = null;
   private visitors: Visitor[] = [];
   private highlight: Highlight | null = null;
+  private buildKind: FixtureKind | null = null;
+  private hover: Pt | null = null;
+  private floaters: Floater[] = [];
   private selected: Pt | null = null;
   private pan: Pt = { x: 0, y: 0 };
   private scale = 1;
@@ -48,6 +60,8 @@ export class IsoRenderer {
   private last = 0;
   private drag: { start: Pt; pan: Pt; moved: boolean } | null = null;
   private ro: ResizeObserver;
+  /** Fractions of the canvas height covered by HUD (top) and dock (bottom). */
+  private insets = { top: 0.17, bottom: 0.11 };
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -85,6 +99,23 @@ export class IsoRenderer {
     this.highlight = h;
   }
 
+  /** In build mode, legal tiles are tinted and a ghost follows the pointer. */
+  setBuildKind(kind: FixtureKind | null) {
+    this.buildKind = kind;
+  }
+
+  /** Floating "+$12,400" style label rising from a tile. */
+  pop(x: number, y: number, text: string, color = '#f2c14e') {
+    this.floaters.push({ x: x + 0.5, y: y + 0.5, text, color, age: 0 });
+  }
+
+  /** Is tonight's event under way? Drives the party crowd. */
+  private partyNow(): boolean {
+    const s = this.state;
+    if (!s) return false;
+    return s.events.some((e) => e.day === s.day) && s.tick >= TIME.eventTick - 2 && s.tick <= TIME.eventTick;
+  }
+
   // ---- layout & input ------------------------------------------------------
 
   private resize() {
@@ -101,11 +132,13 @@ export class IsoRenderer {
     const { width, height } = this.state.floor;
     const b = roomBounds(width, height);
     const cw = this.canvas.clientWidth;
-    const ch = this.canvas.clientHeight;
-    this.scale = Math.min(cw / (b.w + 24), ch / (b.h + 24));
+    const fullH = this.canvas.clientHeight;
+    const top = fullH * this.insets.top;
+    const ch = fullH * (1 - this.insets.top - this.insets.bottom);
+    this.scale = Math.min(cw / (b.w + 16), ch / (b.h + 16));
     this.origin = {
       x: cw / 2 - (b.left + b.w / 2) * this.scale,
-      y: ch / 2 - (b.top + b.h / 2) * this.scale,
+      y: top + ch / 2 - (b.top + b.h / 2) * this.scale,
     };
   }
 
@@ -120,6 +153,11 @@ export class IsoRenderer {
   };
 
   private onMove = (e: PointerEvent) => {
+    if (this.buildKind) {
+      const p = this.local(e);
+      const g = this.gridAt(p);
+      this.hover = g;
+    }
     if (!this.drag) return;
     const p = this.local(e);
     const dx = p.x - this.drag.start.x;
@@ -138,26 +176,51 @@ export class IsoRenderer {
     const drag = this.drag;
     this.drag = null;
     if (!drag || drag.moved || !this.state) return;
-    const p = this.local(e);
-    const g = toGrid(
-      (p.x - this.origin.x - this.pan.x) / this.scale,
-      (p.y - this.origin.y - this.pan.y) / this.scale,
-    );
+    const g = this.gridAt(this.local(e));
+    if (g) this.onTileTap(g.x, g.y);
+  };
+
+  private gridAt(p: Pt): Pt | null {
+    if (!this.state) return null;
+    const sx = (p.x - this.origin.x - this.pan.x) / this.scale;
+    const sy = (p.y - this.origin.y - this.pan.y) / this.scale;
+    const g = toGrid(sx, sy);
     const x = Math.floor(g.x);
     const y = Math.floor(g.y);
     const { width, height } = this.state.floor;
-    if (x >= 0 && y >= 0 && x < width && y < height) this.onTileTap(x, y);
-  };
+    if (x >= 0 && y >= 0 && x < width && y < height) return { x, y };
+    // Not on the floor: maybe on a back wall. Tapping a painting selects the tile it hangs over.
+    const half = TILE_W / 2;
+    if (sx < 0) {
+      const gy = -sx / half;
+      const floorY = toScreen(0, gy).y;
+      if (gy >= 0 && gy < height && sy <= floorY && sy >= floorY - WALL_H) return { x: 0, y: Math.floor(gy) };
+    } else {
+      const gx = sx / half;
+      const floorY = toScreen(gx, 0).y;
+      if (gx >= 0 && gx < width && sy <= floorY && sy >= floorY - WALL_H) return { x: Math.floor(gx), y: 0 };
+    }
+    return null;
+  }
 
   // ---- visitors (cosmetic) -------------------------------------------------
 
   private syncVisitors() {
     const s = this.state!;
-    const lastVisitors = s.reports.at(-1)?.visitors ?? 0;
+    const daily = getVenueModel(s.venue).expectedDailyVisitors(s);
     const hanging = s.floor.fixtures.filter((f) => f.artworkId).length;
-    const want = Math.min(14, Math.round(lastVisitors / 25) + Math.min(hanging, 3));
+    const party = this.partyNow() ? 12 : 0;
+    const want = Math.min(26, Math.round(daily / 6) + Math.min(hanging, 2) + party);
     const palette = ['#2f3e46', '#6d597a', '#b56576', '#355070', '#e56b6f', '#283618', '#9c6644'];
-    while (this.visitors.length < want) {
+    const staying = this.visitors.filter((v) => !v.leaving);
+    // Extra people head for the door rather than vanishing.
+    for (const v of staying.slice(want)) {
+      v.leaving = true;
+      v.tx = s.floor.entrance.x + 0.5;
+      v.ty = s.floor.entrance.y + 0.5;
+    }
+    let count = Math.min(staying.length, want);
+    while (count++ < want) {
       const { x, y } = s.floor.entrance;
       this.visitors.push({
         x: x + 0.5,
@@ -169,7 +232,6 @@ export class IsoRenderer {
         color: palette[this.visitors.length % palette.length],
       });
     }
-    this.visitors.length = want;
   }
 
   private stepVisitors(dt: number) {
@@ -179,6 +241,10 @@ export class IsoRenderer {
       const dx = v.tx - v.x;
       const dy = v.ty - v.y;
       const d = Math.hypot(dx, dy);
+      if (d < 0.05 && v.leaving) {
+        v.wait = -1; // reached the door
+        continue;
+      }
       if (d < 0.05) {
         v.wait -= dt;
         if (v.wait <= 0) {
@@ -199,6 +265,7 @@ export class IsoRenderer {
         v.y += (dy / d) * step;
       }
     }
+    this.visitors = this.visitors.filter((v) => !(v.leaving && v.wait === -1));
   }
 
   // ---- drawing -------------------------------------------------------------
@@ -208,6 +275,8 @@ export class IsoRenderer {
     this.last = t;
     if (this.state) {
       this.stepVisitors(dt);
+      for (const f of this.floaters) f.age += dt;
+      this.floaters = this.floaters.filter((f) => f.age < 1.8);
       this.draw(t);
     }
     this.raf = requestAnimationFrame(this.frame);
@@ -240,7 +309,29 @@ export class IsoRenderer {
     for (const v of this.visitors) items.push({ depth: v.x + v.y, draw: () => this.drawVisitor(v, t) });
     items.sort((a, b) => a.depth - b.depth).forEach((d) => d.draw());
 
+    if (this.buildKind && this.hover) this.drawGhost(this.buildKind, this.hover);
+
+    for (const f of this.floaters) {
+      const p = toScreen(f.x, f.y, 50 + f.age * 40);
+      ctx.globalAlpha = Math.max(0, 1 - f.age / 1.8);
+      ctx.font = '700 15px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(20,16,12,0.85)';
+      ctx.strokeText(f.text, p.x, p.y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, p.x, p.y);
+      ctx.globalAlpha = 1;
+    }
+
     ctx.restore();
+
+    // Evening light: warm dim as the day closes, warmer during a party.
+    const dusk = Math.max(0, (s.tick - (TIME.ticksPerDay - 5)) / 5);
+    if (dusk > 0) {
+      ctx.fillStyle = this.partyNow() ? `rgba(70, 30, 60, ${0.22 * dusk})` : `rgba(20, 24, 60, ${0.28 * dusk})`;
+      ctx.fillRect(0, 0, cw, ch);
+    }
   }
 
   private poly(pts: Pt[], fill: string, stroke?: string) {
@@ -286,6 +377,7 @@ export class IsoRenderer {
         if (sel && sel.x === x && sel.y === y) this.poly(pts, 'rgba(255, 210, 80, 0.45)', '#f2b705');
         const h = this.highlight;
         if (h && h.x === x && h.y === y) this.poly(pts, h.ok ? 'rgba(80, 200, 120, 0.45)' : 'rgba(220, 60, 60, 0.45)');
+        if (this.buildKind && !canPlace(this.state!.floor, this.buildKind, x, y)) this.poly(pts, 'rgba(90, 200, 140, 0.16)');
       }
     }
   }
@@ -382,6 +474,16 @@ export class IsoRenderer {
     }
   }
 
+  private drawGhost(kind: FixtureKind, at: Pt) {
+    const ok = !canPlace(this.state!.floor, kind, at.x, at.y);
+    this.ctx.globalAlpha = 0.55;
+    if (kind === 'wallHang') this.drawWallHang({ id: 'ghost', kind, x: at.x, y: at.y });
+    else this.drawFixture({ id: 'ghost', kind, x: at.x, y: at.y });
+    this.ctx.globalAlpha = 1;
+    const pts = [toScreen(at.x, at.y), toScreen(at.x + 1, at.y), toScreen(at.x + 1, at.y + 1), toScreen(at.x, at.y + 1)];
+    this.poly(pts, ok ? 'rgba(80, 200, 120, 0.35)' : 'rgba(220, 60, 60, 0.35)');
+  }
+
   private drawVisitor(v: Visitor, t: number) {
     const ctx = this.ctx;
     const p = toScreen(v.x, v.y);
@@ -399,6 +501,12 @@ export class IsoRenderer {
     ctx.beginPath();
     ctx.arc(p.x, p.y - 24 + bob, 4, 0, Math.PI * 2);
     ctx.fill();
+    if (this.partyNow()) {
+      ctx.fillStyle = '#8e1f3a';
+      ctx.fillRect(p.x + 5, p.y - 17 + bob, 3, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(p.x + 6, p.y - 13 + bob, 1, 4);
+    }
   }
 }
 

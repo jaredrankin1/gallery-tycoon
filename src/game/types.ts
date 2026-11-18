@@ -20,8 +20,10 @@ export interface Artist {
   /** How quickly the relationship moves, and how much neglect hurts. 0.5 = easygoing, 1.5 = touchy. */
   temperament: number;
   relationship: Relationship;
-  /** Week the player last did something with this artist (for neglect decay). */
-  lastContactWeek: number;
+  /** Day the player last did something with this artist (for neglect decay). */
+  lastContactDay: number;
+  /** Day of the last studio visit (one per day). */
+  lastVisitDay?: number;
   /** Persona tags used by content/events, e.g. "loves-wine", "reclusive". */
   traits: string[];
 }
@@ -39,8 +41,8 @@ export interface Artwork {
   /** Asking price for an offer, or the player's list price on the gallery floor. */
   price: number;
   status: ArtworkStatus;
-  /** Week an offer expires, or the week it was acquired/sold. */
-  week: number;
+  /** Day an offer expires, or the day it was acquired/sold. */
+  day: number;
 }
 
 export type EventKind = 'opening' | 'reception' | 'talk' | 'gala';
@@ -58,7 +60,8 @@ export interface HospitalityPlan {
 export interface ScheduledEvent {
   id: Id;
   kind: EventKind;
-  week: number;
+  /** Happens on the evening of this day. */
+  day: number;
   featuredArtistIds: Id[];
   hospitality: HospitalityPlan;
   /** Locked in when booked so the books are predictable. */
@@ -68,7 +71,7 @@ export interface ScheduledEvent {
 export interface EventResult {
   eventId: Id;
   kind: EventKind;
-  week: number;
+  day: number;
   attendance: number;
   catered: number;
   /** 0..1, how well food and wine matched the crowd. */
@@ -79,7 +82,7 @@ export interface EventResult {
   soldArtworkIds: Id[];
   /** Ticket/door income during the event (museum). */
   income: number;
-  /** Human-readable reasons, shown in the weekly report. */
+  /** Human-readable reasons, shown in the feed. */
   notes: string[];
 }
 
@@ -95,22 +98,33 @@ export type LedgerCategory =
   | 'tickets';
 
 export interface LedgerEntry {
-  week: number;
+  day: number;
   category: LedgerCategory;
   /** Positive = income, negative = expense. */
   amount: number;
   note: string;
 }
 
-export interface WeeklyReport {
-  week: number;
+/** One finished day, for charts. */
+export interface DayReport {
+  day: number;
   income: number;
   expenses: number;
-  cashAfter: number;
   visitors: number;
-  sales: Id[];
-  events: EventResult[];
-  notes: string[];
+  sales: number;
+}
+
+export type FeedKind = 'sale' | 'tickets' | 'event' | 'artist' | 'bills' | 'market' | 'warn';
+
+/** Something worth telling the player about, as it happens. The UI shows new ones as toasts. */
+export interface FeedItem {
+  id: number;
+  day: number;
+  kind: FeedKind;
+  text: string;
+  amount?: number;
+  /** Tile to pop a floating label over, if it happened somewhere on the floor. */
+  at?: { x: number; y: number };
 }
 
 /** Player-set spending targets per week. Purely advisory for now; the books compare against them. */
@@ -151,11 +165,14 @@ export interface FloorPlan {
 }
 
 export interface GameState {
-  version: 1;
+  version: 2;
   name: string;
   difficulty: Difficulty;
   venue: VenueType;
-  week: number;
+  /** Day number, starting at 1. Day 1 is a Monday. */
+  day: number;
+  /** Hour slot within the day, 0 .. TICKS_PER_DAY - 1. */
+  tick: number;
   cash: number;
   /** 0..100 */
   reputation: number;
@@ -166,7 +183,11 @@ export interface GameState {
   floor: FloorPlan;
   events: ScheduledEvent[];
   ledger: LedgerEntry[];
-  reports: WeeklyReport[];
+  /** Running totals for the day in progress. */
+  today: DayReport;
+  history: DayReport[];
+  feed: FeedItem[];
+  feedSeq: number;
   /** Seeded RNG state so a run is reproducible. */
   rng: number;
   nextId: number;

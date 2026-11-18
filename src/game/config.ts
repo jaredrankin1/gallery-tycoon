@@ -88,32 +88,53 @@ export interface EventKindConfig {
   maxFeatured: number;
   /** How much the event moves reputation at full satisfaction. */
   prestige: number;
-  minWeeksAhead: number;
+  /** Earliest booking: this many days from today. */
+  minDaysAhead: number;
 }
 
 export const EVENT_KIND: Record<EventKind, EventKindConfig> = {
-  opening: { label: 'Show opening', short: 'Opening', baseCost: 1_500, baseAttendance: 60, minFeatured: 1, maxFeatured: 1, prestige: 4, minWeeksAhead: 1 },
-  reception: { label: 'Reception', short: 'Reception', baseCost: 800, baseAttendance: 35, minFeatured: 0, maxFeatured: 2, prestige: 2, minWeeksAhead: 1 },
-  talk: { label: 'Artist talk', short: 'Talk', baseCost: 400, baseAttendance: 25, minFeatured: 1, maxFeatured: 1, prestige: 1, minWeeksAhead: 1 },
-  gala: { label: 'Gala', short: 'Gala', baseCost: 6_000, baseAttendance: 150, minFeatured: 2, maxFeatured: 4, prestige: 8, minWeeksAhead: 2 },
+  opening: { label: 'Show opening', short: 'Opening', baseCost: 1_500, baseAttendance: 60, minFeatured: 1, maxFeatured: 1, prestige: 4, minDaysAhead: 2 },
+  reception: { label: 'Reception', short: 'Reception', baseCost: 800, baseAttendance: 35, minFeatured: 0, maxFeatured: 2, prestige: 2, minDaysAhead: 1 },
+  talk: { label: 'Artist talk', short: 'Talk', baseCost: 400, baseAttendance: 25, minFeatured: 1, maxFeatured: 1, prestige: 1, minDaysAhead: 1 },
+  gala: { label: 'Gala', short: 'Gala', baseCost: 6_000, baseAttendance: 150, minFeatured: 2, maxFeatured: 4, prestige: 8, minDaysAhead: 5 },
+};
+
+/** The clock. The game runs in real time; the player can pause or speed it up. */
+export const TIME = {
+  /** Hour slots per day. Doors open at OPEN_HOUR, one slot per hour. */
+  ticksPerDay: 12,
+  openHour: 10,
+  /** Slot when the day's event happens (7 PM). */
+  eventTick: 9,
+  /** Real seconds per game day at 1x. */
+  secondsPerDay: 6,
+  speeds: [0, 1, 2, 4] as const,
+  /** Rent and staff are paid on this weekday (0 = Monday). Runs at end of day. */
+  billsWeekday: 6,
+  weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const,
 };
 
 export const RULES = {
   maxLedgerEntries: 400,
-  maxReports: 52,
-  /** Offers on the market each week. */
-  marketSize: 4,
-  offerLifetimeWeeks: 2,
+  historyDays: 28,
+  maxFeed: 30,
+  /** Offers on the market at once. */
+  marketSize: 5,
+  /** New offers that appear per day (when there is room). */
+  newOffersPerDay: 1,
+  offerLifetimeDays: 5,
   /** Relationship needed before an artist offers you works directly. */
   relationshipForOffers: 20,
-  /** Weeks without contact before an artist starts to feel neglected. */
-  neglectAfterWeeks: 4,
+  /** Days without contact before an artist starts to feel neglected. */
+  neglectAfterDays: 21,
+  /** Relationship lost per neglected day (times temperament). */
+  neglectPerDay: 0.25,
   studioVisitCost: 300,
   studioVisitGain: 6,
-  /** Museum: base weekly walk-ins at reputation 0 with one work on display. */
-  museumBaseVisitors: 120,
-  /** Gallery: weekly chance a displayed work sells when priced at value. */
-  gallerySaleChance: 0.12,
+  /** Museum: base daily walk-ins at reputation 0 with one work on display. */
+  museumBaseVisitors: 45,
+  /** Gallery: daily chance a displayed work sells when priced at value. */
+  gallerySaleChance: 0.05,
   /** Cash floor before the game ends. */
   overdraftLimit: -5_000,
 };

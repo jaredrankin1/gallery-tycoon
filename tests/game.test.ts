@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createNewGame, dispatch, DIFFICULTY, type GameState, type Action } from '../src/game';
+import { createNewGame, dispatch, DIFFICULTY, TIME, type Action, type GameState } from '../src/game';
 
 const run = (s: GameState, a: Action) => {
   const r = dispatch(s, a);
   if (!r.ok) throw new Error(r.error);
   return r.state;
 };
+const days = (s: GameState, n: number) => run(s, { type: 'tick', hours: n * TIME.ticksPerDay });
 const offers = (s: GameState) => Object.values(s.artworks).filter((w) => w.status === 'offered');
 
 describe('new game', () => {
@@ -14,25 +15,47 @@ describe('new game', () => {
       expect(createNewGame({ name: 'x', difficulty: d, venue: 'gallery', seed: 1 }).cash).toBe(DIFFICULTY[d].startingCash);
     }
   });
-  it('starts with a market, a floor and artists', () => {
+  it('starts with a full market, a floor and artists', () => {
     const s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'museum', seed: 1 });
-    expect(offers(s).length).toBeGreaterThan(0);
+    expect(offers(s).length).toBe(5);
     expect(s.floor.fixtures.some((f) => f.kind === 'wallHang')).toBe(true);
     expect(Object.keys(s.artists).length).toBeGreaterThan(0);
   });
 });
 
-describe('loop', () => {
+describe('clock', () => {
+  it('advances hours, then days', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 1 });
+    s = run(s, { type: 'tick', hours: 3 });
+    expect([s.day, s.tick]).toEqual([1, 3]);
+    s = days(s, 1);
+    expect([s.day, s.tick]).toEqual([2, 3]);
+    expect(s.history).toHaveLength(1);
+  });
+
   it('is deterministic for a seed', () => {
-    const play = () => {
-      let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 42 });
-      for (let i = 0; i < 5; i++) s = run(s, { type: 'advanceWeek' });
-      return s;
-    };
+    const play = () => days(createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 42 }), 10);
     expect(play()).toEqual(play());
   });
 
-  it('buying and hanging art, then weeks pass', () => {
+  it('pays weekly bills on Sunday night', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 5 });
+    s = days(s, 6);
+    expect(s.ledger.some((e) => e.category === 'rent')).toBe(false);
+    s = days(s, 1);
+    expect(s.ledger.filter((e) => e.category === 'rent')).toHaveLength(1);
+    expect(s.feed.some((f) => f.kind === 'bills')).toBe(true);
+  });
+
+  it('goes bankrupt when cash runs out', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'hard', venue: 'gallery', seed: 1 });
+    for (let i = 0; i < 300 && s.status === 'playing'; i++) s = days(s, 1);
+    expect(s.status).toBe('bankrupt');
+  });
+});
+
+describe('venues', () => {
+  it('buying and hanging art', () => {
     let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 7 });
     const w = offers(s)[0];
     const cash = s.cash;
@@ -42,18 +65,31 @@ describe('loop', () => {
     s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
     expect(s.artworks[w.id].status).toBe('display');
     expect(s.floor.fixtures.some((f) => f.artworkId === w.id)).toBe(true);
-    for (let i = 0; i < 10; i++) s = run(s, { type: 'advanceWeek' });
-    expect(s.week).toBe(11);
   });
 
-  it('museum earns ticket money from displayed art', () => {
+  it('gallery eventually sells displayed work and reports it', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 11 });
+    for (const w of offers(s).slice(0, 4)) {
+      s = run(s, { type: 'buyArtwork', artworkId: w.id });
+      s = run(s, { type: 'setPrice', artworkId: w.id, price: Math.round(s.artworks[w.id].value * 0.9) });
+      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    }
+    s = days(s, 30);
+    expect(Object.values(s.artworks).some((w) => w.status === 'sold')).toBe(true);
+    expect(s.ledger.some((e) => e.category === 'sales')).toBe(true);
+  });
+
+  it('museum earns ticket money hour by hour from displayed art', () => {
     let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'museum', seed: 3 });
-    const w = offers(s)[0];
-    s = run(s, { type: 'buyArtwork', artworkId: w.id });
-    s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
-    s = run(s, { type: 'advanceWeek' });
-    expect(s.reports[0].income).toBeGreaterThan(0);
-    expect(s.ledger.some((e) => e.category === 'tickets')).toBe(true);
+    for (const w of offers(s).slice(0, 2)) {
+      s = run(s, { type: 'buyArtwork', artworkId: w.id });
+      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    }
+    const before = s.cash;
+    s = run(s, { type: 'tick', hours: 6 });
+    expect(s.cash).toBeGreaterThan(before);
+    // Ticket income merges into one ledger line per day.
+    expect(s.ledger.filter((e) => e.category === 'tickets')).toHaveLength(1);
   });
 
   it('museums cannot set sale prices', () => {
@@ -63,27 +99,30 @@ describe('loop', () => {
 });
 
 describe('events and hospitality', () => {
-  it('books, charges wine & cheese, resolves and moves the relationship', () => {
+  it('books, charges wine & cheese, resolves at 7 PM and moves the relationship', () => {
     let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 9 });
     const cash = s.cash;
     s = run(s, {
       type: 'scheduleEvent',
       kind: 'talk',
-      week: 2,
+      day: 2,
       featuredArtistIds: ['a-hollis'],
       hospitality: { wine: 2, cheese: 2, guests: 40 },
     });
     expect(s.cash).toBe(cash - 400 - 40 * 18);
-    s = run(s, { type: 'advanceWeek' });
-    s = run(s, { type: 'advanceWeek' });
-    expect(s.reports[1].events).toHaveLength(1);
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay + TIME.eventTick });
+    expect(s.events).toHaveLength(1);
+    s = run(s, { type: 'tick', hours: 1 });
+    expect(s.events).toHaveLength(0);
+    expect(s.feed.some((f) => f.kind === 'event')).toBe(true);
     expect(s.artists['a-hollis'].relationship).toBeGreaterThan(0);
   });
 
-  it('rejects events with the wrong number of artists', () => {
+  it('rejects events with the wrong number of artists or too soon', () => {
     const s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 9 });
-    const r = dispatch(s, { type: 'scheduleEvent', kind: 'opening', week: 2, featuredArtistIds: [], hospitality: { wine: 1, cheese: 1, guests: 10 } });
-    expect(r.ok).toBe(false);
+    const plan = { wine: 1, cheese: 1, guests: 10 } as const;
+    expect(dispatch(s, { type: 'scheduleEvent', kind: 'opening', day: 3, featuredArtistIds: [], hospitality: plan }).ok).toBe(false);
+    expect(dispatch(s, { type: 'scheduleEvent', kind: 'gala', day: 2, featuredArtistIds: ['a-mara', 'a-junie'], hospitality: plan }).ok).toBe(false);
   });
 });
 
@@ -93,10 +132,4 @@ describe('floor', () => {
     expect(dispatch(s, { type: 'placeFixture', kind: 'wallHang', x: 3, y: 3 }).ok).toBe(false);
     expect(dispatch(s, { type: 'placeFixture', kind: 'pedestal', x: 3, y: 3 }).ok).toBe(true);
   });
-});
-
-it('goes bankrupt when cash runs out', () => {
-  let s = createNewGame({ name: 'x', difficulty: 'hard', venue: 'gallery', seed: 1 });
-  for (let i = 0; i < 40 && s.status === 'playing'; i++) s = run(s, { type: 'advanceWeek' });
-  expect(s.status).toBe('bankrupt');
 });

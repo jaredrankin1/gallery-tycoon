@@ -4,6 +4,7 @@ import { clamp, Rng } from '../rng';
 import type { EventResult, GameState, HospitalityPlan, ScheduledEvent } from '../types';
 import { getVenueModel } from '../venues';
 import { adjustRelationship } from './artists';
+import { notify } from './feed';
 import { post } from './ledger';
 
 export function hospitalityCost(plan: HospitalityPlan): number {
@@ -25,7 +26,7 @@ export function expectedAttendance(state: GameState, kind: ScheduledEvent['kind'
   );
 }
 
-/** Resolves one event on its week. Mutates state and returns what happened. */
+/** Resolves one event on its evening. Mutates state and returns what happened. */
 export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng): EventResult {
   const cfg = EVENT_KIND[event.kind];
   const { wine, cheese, guests } = event.hospitality;
@@ -76,10 +77,18 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
   const venue = getVenueModel(state.venue);
   const { income, soldArtworkIds } = venue.onEvent(state, event, attendance, satisfaction, rng);
 
+  const verdict = satisfaction > 0.7 ? 'A triumph.' : satisfaction > 0.4 ? 'A pleasant evening.' : 'Guests left hungry.';
+  notify(state, {
+    kind: 'event',
+    text: `${EVENT_KIND[event.kind].label}: ${attendance} came, catered for ${guests}. ${verdict}`,
+  });
+  for (const n of notes) notify(state, { kind: 'artist', text: n });
+  state.today.visitors += attendance;
+
   return {
     eventId: event.id,
     kind: event.kind,
-    week: event.week,
+    day: event.day,
     attendance,
     catered: guests,
     satisfaction,
@@ -94,6 +103,6 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
 /** Charges the booking. Kept separate so cancellations can refund the same split. */
 export function chargeEvent(state: GameState, event: ScheduledEvent): void {
   const cost = eventCost(event.kind, event.hospitality);
-  post(state, 'events', -cost.base, `${EVENT_KIND[event.kind].label} booking (week ${event.week})`);
+  post(state, 'events', -cost.base, `${EVENT_KIND[event.kind].label} booking (day ${event.day})`);
   if (cost.hospitality > 0) post(state, 'hospitality', -cost.hospitality, `Wine & cheese for ${event.hospitality.guests}`);
 }

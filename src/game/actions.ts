@@ -5,7 +5,7 @@ import { adjustRelationship } from './systems/artists';
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, freeDisplayFixture, unhang } from './systems/floor';
 import { post } from './systems/ledger';
-import { advanceWeek } from './turn';
+import { stepHour } from './clock';
 import type { BudgetPlan, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from './types';
 import { getVenueModel } from './venues';
 
@@ -19,10 +19,11 @@ export type Action =
   | { type: 'setPrice'; artworkId: Id; price: number }
   | { type: 'setTicketPrice'; price: number }
   | { type: 'studioVisit'; artistId: Id }
-  | { type: 'scheduleEvent'; kind: EventKind; week: number; featuredArtistIds: Id[]; hospitality: HospitalityPlan }
+  | { type: 'scheduleEvent'; kind: EventKind; day: number; featuredArtistIds: Id[]; hospitality: HospitalityPlan }
   | { type: 'cancelEvent'; eventId: Id }
   | { type: 'setBudget'; budget: BudgetPlan }
-  | { type: 'advanceWeek' };
+  /** Advance the clock by some hours. The real-time loop sends this. */
+  | { type: 'tick'; hours: number };
 
 export type ActionResult = { ok: true; state: GameState } | { ok: false; state: GameState; error: string };
 
@@ -47,7 +48,7 @@ function apply(state: GameState, action: Action): string | void {
       work.acquiredFor = work.price;
       work.price = Math.round((work.value * state.settings.defaultMarkup) / 50) * 50;
       work.status = 'storage';
-      work.week = state.week;
+      work.day = state.day;
       adjustRelationship(state, work.artistId, 5);
       return;
     }
@@ -104,15 +105,16 @@ function apply(state: GameState, action: Action): string | void {
     case 'studioVisit': {
       const artist = state.artists[action.artistId];
       if (!artist) return 'Unknown artist.';
-      if (artist.lastContactWeek === state.week && artist.relationship !== 0) return `You’ve already seen ${artist.name} this week.`;
+      if (artist.lastVisitDay === state.day) return `You’ve already visited ${artist.name} today.`;
       post(state, 'artist-care', -RULES.studioVisitCost, `Studio visit: ${artist.name}`);
       adjustRelationship(state, artist.id, RULES.studioVisitGain);
+      artist.lastVisitDay = state.day;
       return;
     }
     case 'scheduleEvent': {
       const cfg = EVENT_KIND[action.kind];
-      if (action.week < state.week + cfg.minWeeksAhead) return `Book a ${cfg.label.toLowerCase()} at least ${cfg.minWeeksAhead} week(s) ahead.`;
-      if (state.events.some((e) => e.week === action.week)) return 'You already have an event that week.';
+      if (action.day < state.day + cfg.minDaysAhead) return `Book a ${cfg.label.toLowerCase()} at least ${cfg.minDaysAhead} day(s) ahead.`;
+      if (state.events.some((e) => e.day === action.day)) return 'You already have an event that night.';
       const n = action.featuredArtistIds.length;
       if (n < cfg.minFeatured || n > cfg.maxFeatured) {
         return cfg.minFeatured === cfg.maxFeatured
@@ -130,14 +132,14 @@ function apply(state: GameState, action: Action): string | void {
       const event = {
         id: newId(state, 'e'),
         kind: action.kind,
-        week: action.week,
+        day: action.day,
         featuredArtistIds: [...action.featuredArtistIds],
         hospitality: { ...action.hospitality },
         cost: cost.total,
       };
       chargeEvent(state, event);
       state.events.push(event);
-      state.events.sort((a, b) => a.week - b.week);
+      state.events.sort((a, b) => a.day - b.day);
       return;
     }
     case 'cancelEvent': {
@@ -152,9 +154,9 @@ function apply(state: GameState, action: Action): string | void {
       state.budget = { art: Math.max(0, action.budget.art), hospitality: Math.max(0, action.budget.hospitality) };
       return;
     }
-    case 'advanceWeek': {
+    case 'tick': {
       const rng = new Rng(state.rng);
-      advanceWeek(state, rng);
+      for (let i = 0; i < action.hours && state.status === 'playing'; i++) stepHour(state, rng);
       state.rng = rng.state;
       return;
     }
