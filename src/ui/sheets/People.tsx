@@ -79,7 +79,7 @@ function GuestList() {
                   <RelationshipBar value={g.affinity} />
                 </div>
                 <Tastes g={g} />
-                <small class="muted">{ROLE_HINT[g.role]}</small>
+                <small class="muted">{g.role === 'student' && !g.traits.includes('photographer') ? 'Sketches what moves them, tells their classmates, never buys.' : ROLE_HINT[g.role]}</small>
                 {g.visits > 0 && (
                   <small class="muted">
                     {g.visits} visit{g.visits === 1 ? '' : 's'}

@@ -32,7 +32,7 @@ and each hour is one simulation step.
 - **Floor**: tap a wall spot or pedestal to hang art, set its price (gallery) or take it down. Tap a painting on the wall to inspect it.
 - **Build**: wall spots, pedestals, a wine bar, benches and plants on the isometric grid, with a live placement preview.
 - **Crowd**: every visitor the game counts walks in as a person, one for one. Members of the public wear recoloured outfits so they never pass for the named characters; the people icon in the top bar is exactly how many are on the floor right now. Events fill the room with their whole attendance.
-- **Visitors**: eight named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
+- **Visitors**: twelve named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
 - **Artists** (under People): studio visits build relationships, and neglect cools them. "Give a show" opens the event planner with that artist already picked.
 - **Events**: book an opening, reception, talk or gala on a future night. Choose featured artists, wine and cheese tiers, and how many guests to cater for. Events happen at 7 PM, with a crowd holding glasses on the floor.
 - **Books**: the last 14 days of income and spending, weekly art and wine & cheese budgets, the ticket price (museum), and the ledger.
@@ -93,7 +93,7 @@ tests/game.test.ts      Logic tests
 - **New fixture** (lighting, gift shop, coat check): add to `FixtureKind`, `FIXTURE`, draw it in `IsoRenderer.drawFixture`, and give it an effect in a system.
 - **New venue type**: implement `VenueModel` in `venues/` and register it in `venues/index.ts`.
 - **Balance**: almost everything is in `config.ts`.
-- **New visitor**: drop a sprite sheet in `art/source/`, run `python3 tools/slice_sprites.py`, and add a seed to `src/data/guests.ts`.
+- **New visitor**: drop a sprite sheet in `art/source/` (fixed grid layout) and run `python3 tools/slice_sprites.py`, or in `art/source/v2/` (free-form sheets) and point at each frame in `tools/slice_sprites_v2.py`, then run it. Run the v2 script after the first one, since the first rewrites `sprites.json`. Then add a seed to `src/data/guests.ts`.
 - **New painting**: add a card sheet to `art/source/paintings/`, run `python3 tools/slice_art.py`, and list each work in `src/data/paintings.ts`.
 - **Art**: rooms and sculpture are procedural; paintings and characters come from the sheets in `art/source/`.
 

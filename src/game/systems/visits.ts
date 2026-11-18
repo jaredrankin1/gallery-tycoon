@@ -130,14 +130,17 @@ function planSteps(state: GameState, guest: Pick<Guest, 'id' | 'likes' | 'dislik
     const j = Math.floor(rng.next() * (i + 1));
     [spots[i], spots[j]] = [spots[j], spots[i]];
   }
-  return spots.slice(0, max).map((f) => {
+  return spots.slice(0, max).map((f, i) => {
     const work = state.artworks[f.artworkId!];
     const score = tasteScore(guest as Guest, work, state.artists[work.artistId]);
     const reaction = reactionFor(score);
     const { at, faceLeft } = standSpot(f, state.floor, guest.id + f.id, spread);
     let action: VisitStep['action'];
-    if (guest.traits.includes('note-taker')) action = 'notes';
-    else if (guest.traits.includes('photographer') && score >= 0.55) action = 'photo';
+    const notes = guest.traits.includes('note-taker');
+    const photos = guest.traits.includes('photographer') && score >= 0.55;
+    // People who do both alternate: sketch one, photograph the next.
+    if (notes && (!photos || i % 2 === 0)) action = 'notes';
+    else if (photos) action = 'photo';
     return { artworkId: work.id, at, faceLeft, score, reaction, action };
   });
 }
@@ -168,7 +171,10 @@ function arrivalChance(state: GameState, g: Guest): number {
 // ---------------------------------------------------------------------------
 // The public: everyone the visitor count counts, walking in one by one.
 
-const CROWD_SPRITES = GUEST_SEEDS.map((g) => g.sprite);
+// Mostly-black-and-white outfits barely change when recoloured, so those
+// characters stay unique rather than having lookalikes in the crowd.
+const UNIQUE_LOOKS = ['beatrix', 'hana'];
+const CROWD_SPRITES = GUEST_SEEDS.map((g) => g.sprite).filter((s) => !UNIQUE_LOOKS.includes(s));
 /** Recolours per sprite (see render/sprites.ts). 0 is the named character's own look. */
 export const CROWD_VARIANTS = 5;
 const CROWD_TAGS = ['painting', 'portrait', 'landscape', 'colorful', 'pop', 'classic', 'quiet', 'moody', 'fantasy', 'weird', 'retro', 'digital', 'sculpture', 'figurative'];
