@@ -240,6 +240,8 @@ export interface GuestVisit {
   chatWith?: Id;
   /** Came for tonight's event. */
   event?: boolean;
+  /** Closing time: drop what they're doing at this hour and walk out. */
+  leaveBy?: number;
   /** Set for an ordinary member of the public (not one of the named guests): which sprite, and which recolour. */
   look?: { sprite: string; variant: number };
 }

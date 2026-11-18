@@ -106,6 +106,8 @@ export const TIME = {
   openHour: 10,
   /** Slot when the day's event happens (7 PM). */
   eventTick: 9,
+  /** From this slot the doors are shut to new visitors and everyone heads out (9 PM). */
+  closingTick: 10,
   /** Real seconds per game day at 1x. */
   secondsPerDay: 20,
   speeds: [0, 1, 2, 4] as const,

@@ -222,3 +222,24 @@ describe('one person per visitor', () => {
     });
   }
 });
+
+describe('closing time', () => {
+  it('everyone walks out before the doors lock', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'museum', seed: 8 });
+    for (const w of offers(s).slice(0, 4)) {
+      s = run(s, { type: 'buyArtwork', artworkId: w.id });
+      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    }
+    s = run(s, { type: 'tick', hours: TIME.closingTick + 1 });
+    const dayEnd = TIME.ticksPerDay;
+    expect(s.visits.length).toBeGreaterThan(0);
+    for (const v of s.visits) {
+      expect(v.end).toBeLessThanOrEqual(dayEnd);
+      const segs = visitTimeline(v, s.floor);
+      const last = segs[segs.length - 1];
+      expect(last.anim).toBe('walk');
+      expect(last.to).toEqual({ x: s.floor.entrance.x + 0.5, y: s.floor.entrance.y + 0.5 });
+    }
+    expect(s.feed.some((f) => f.text.startsWith('Closing time'))).toBe(true);
+  });
+});

@@ -103,7 +103,7 @@ export class IsoRenderer {
     const first = !this.state || this.state.floor.width !== state.floor.width;
     this.state = state;
     if (first) this.pan = { x: 0, y: 0 };
-    const live = new Set(state.visits.map((v) => `${v.guestId}@${v.start}`));
+    const live = new Set(state.visits.map((v) => `${v.guestId}@${v.start}@${v.leaveBy ?? ''}`));
     for (const k of this.timelines.keys()) if (!live.has(k)) this.timelines.delete(k);
     this.layout();
   }
@@ -510,10 +510,10 @@ export class IsoRenderer {
   }
 
   private timeline(v: GuestVisit): Segment[] {
-    const key = `${v.guestId}@${v.start}`;
+    const key = `${v.guestId}@${v.start}@${v.leaveBy ?? ''}`;
     let segs = this.timelines.get(key);
     if (!segs) {
-      segs = visitTimeline(v, this.state!.floor, v.event ? v.end : undefined);
+      segs = visitTimeline(v, this.state!.floor);
       this.timelines.set(key, segs);
     }
     return segs;

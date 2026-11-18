@@ -42,6 +42,10 @@ happen, and sales pop floating "+$" labels over the painting. Rent and staff
 are paid every Sunday night. If cash drops below the overdraft limit, the
 doors close.
 
+At 9 PM the doors shut to new visitors and everyone still browsing heads for
+the exit, so the room is empty by 10 PM. Party guests stay for the event and
+leave in time too.
+
 ## Layout
 
 ```

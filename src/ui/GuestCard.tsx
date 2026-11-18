@@ -26,7 +26,7 @@ export function GuestCard({ id }: { id: string }) {
 
   let doing = 'Heading out';
   if (visit) {
-    const pose = poseAt(visitTimeline(visit, state.floor, visit.event ? visit.end : undefined), absHour(state) + store.hourProgress);
+    const pose = poseAt(visitTimeline(visit, state.floor), absHour(state) + store.hourProgress);
     if (pose) {
       const step = pose.seg.step !== undefined ? visit.steps[pose.seg.step] : undefined;
       const work = step ? state.artworks[step.artworkId] : undefined;

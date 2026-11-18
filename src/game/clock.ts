@@ -34,7 +34,8 @@ export function stepHour(state: GameState, rng: Rng): void {
   const venue = getVenueModel(state.venue);
 
   // Everyone counted here walks in as a person on the floor.
-  const arrivals = venue.hour(state, rng);
+  // After closing time the doors are shut: no new visitors, no trade.
+  const arrivals = state.tick >= TIME.closingTick ? 0 : venue.hour(state, rng);
   state.today.visitors += arrivals;
   hourOfGuests(state, rng, arrivals);
 
