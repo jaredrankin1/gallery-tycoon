@@ -10,7 +10,7 @@ import {
   type GuestVisit,
   type Segment,
 } from '../game';
-import { atlas, preloadSprites, SPRITES } from './sprites';
+import { crowdAtlas, preloadSprites, SPRITES } from './sprites';
 import { paintingImage, preloadPaintings } from './paintings';
 import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
 
@@ -57,6 +57,10 @@ export class IsoRenderer {
   private selectedGuest: string | null = null;
   /** Absolute game time (hours, fractional), supplied by the UI each frame. */
   private clock: () => number = () => 0;
+  /** Tells the HUD how many people are on the floor right now. */
+  private onCount: (n: number) => void = () => {};
+  private lastCount = -1;
+  private guestCount = 0;
   private highlight: Highlight | null = null;
   private buildKind: FixtureKind | null = null;
   private hover: Pt | null = null;
@@ -118,6 +122,10 @@ export class IsoRenderer {
 
   setSelectedGuest(id: string | null) {
     this.selectedGuest = id;
+  }
+
+  setOnCount(fn: (n: number) => void) {
+    this.onCount = fn;
   }
 
   /** Where the game clock is right now, in absolute hours (see absHour). */
@@ -276,10 +284,16 @@ export class IsoRenderer {
     }
     const now = this.clock();
     this.guestHits = [];
+    this.guestCount = 0;
     for (const v of s.visits) {
       if (now < v.start || now >= v.end) continue;
+      this.guestCount++;
       const pose = poseAt(this.timeline(v), now);
       if (pose) items.push({ depth: pose.x + pose.y, draw: () => this.drawGuest(v, pose, t) });
+    }
+    if (this.guestCount !== this.lastCount) {
+      this.lastCount = this.guestCount;
+      this.onCount(this.guestCount);
     }
     items.sort((a, b) => a.depth - b.depth).forEach((d) => d.draw());
 
@@ -509,9 +523,10 @@ export class IsoRenderer {
   private drawGuest(v: GuestVisit, pose: NonNullable<ReturnType<typeof poseAt>>, t: number) {
     const s = this.state!;
     const g = s.guests[v.guestId];
-    const meta = g && SPRITES[g.sprite];
+    const sprite = v.look?.sprite ?? g?.sprite;
+    const meta = sprite && SPRITES[sprite];
     if (!meta) return;
-    const img = atlas(g.sprite);
+    const img = crowdAtlas(sprite, v.look?.variant ?? 0);
     const ctx = this.ctx;
     const { seg, local } = pose;
     const [row, frames] = meta.anims[seg.anim];
@@ -529,7 +544,7 @@ export class IsoRenderer {
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, 11, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-    if (img.complete && img.naturalWidth) {
+    if (img) {
       ctx.save();
       ctx.translate(p.x, p.y + 2);
       if (seg.faceLeft) ctx.scale(-1, 1);
@@ -542,7 +557,7 @@ export class IsoRenderer {
     const sy = this.origin.y + this.pan.y;
     const k = this.scale;
     this.guestHits.push({
-      id: g.id,
+      id: v.guestId,
       x0: sx + (p.x - (cw * scale) / 2) * k,
       x1: sx + (p.x + (cw * scale) / 2) * k,
       y0: sy + (p.y - ch * scale) * k,
@@ -572,8 +587,8 @@ export class IsoRenderer {
       ctx.arc(p.x + (seg.faceLeft ? -8 : 8), p.y - ch * scale * 0.8, 10, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (this.selectedGuest === g.id) {
-      const label = shortName(g);
+    if (this.selectedGuest === v.guestId) {
+      const label = g ? shortName(g) : 'Visitor';
       ctx.font = '700 10px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       const w = ctx.measureText(label).width + 10;

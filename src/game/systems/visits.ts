@@ -1,5 +1,6 @@
 import { FIXTURE, GUESTS, TIME } from '../config';
 import { clamp, type Rng } from '../rng';
+import { GUEST_SEEDS } from '../../data/guests';
 import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, ScheduledEvent, VisitStep } from '../types';
 import { sellArtwork } from '../venues/gallery';
 import { notify } from './feed';
@@ -23,14 +24,18 @@ export const shortName = (g: Guest) => (g.name.includes('â€œ') ? g.name.match(/â
 // Where to stand
 
 /** Where someone stands to look at a fixture, and which way they face. */
-export function standSpot(f: Fixture, floor: FloorPlan, jitterKey: string) {
-  const j = (hash01(jitterKey) - 0.5) * 0.3;
+export function standSpot(f: Fixture, floor: FloorPlan, jitterKey: string, spread = 0) {
+  const j = (hash01(jitterKey) - 0.5) * (0.3 + spread * 0.5);
+  // Crowds fan out: some people hang back to see over the ones in front.
+  const back = hash01(jitterKey + 'b') * spread;
   if (f.kind === 'wallHang') {
-    return f.x === 0 ? { at: { x: 1.45, y: f.y + 0.5 + j }, faceLeft: true } : { at: { x: f.x + 0.5 + j, y: 1.45 }, faceLeft: false };
+    return f.x === 0
+      ? { at: { x: Math.min(floor.width - 0.5, 1.45 + back), y: f.y + 0.5 + j }, faceLeft: true }
+      : { at: { x: f.x + 0.5 + j, y: Math.min(floor.height - 0.5, 1.45 + back) }, faceLeft: false };
   }
   return f.x + 1 < floor.width
-    ? { at: { x: f.x + 1.5, y: f.y + 0.5 + j }, faceLeft: true }
-    : { at: { x: f.x + 0.5 + j, y: f.y + 1.5 }, faceLeft: false };
+    ? { at: { x: Math.min(floor.width - 0.5, f.x + 1.5 + back * 0.6), y: f.y + 0.5 + j }, faceLeft: true }
+    : { at: { x: f.x + 0.5 + j, y: Math.min(floor.height - 0.5, f.y + 1.5 + back * 0.6) }, faceLeft: false };
 }
 
 const door = (floor: FloorPlan) => ({ x: floor.entrance.x + 0.5, y: floor.entrance.y + 0.5 });
@@ -53,7 +58,7 @@ export interface Segment {
 /** Screen-left in isometric terms: moving +y or -x goes left on screen. */
 const leftward = (a: { x: number; y: number }, b: { x: number; y: number }) => b.x - a.x - (b.y - a.y) < 0;
 
-export function visitTimeline(v: Pick<GuestVisit, 'start' | 'steps' | 'chatWith' | 'event'>, floor: FloorPlan, eventEnd?: number): Segment[] {
+export function visitTimeline(v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatWith' | 'event'>, floor: FloorPlan, eventEnd?: number): Segment[] {
   const segs: Segment[] = [];
   let t = v.start;
   let pos = door(floor);
@@ -85,7 +90,9 @@ export function visitTimeline(v: Pick<GuestVisit, 'start' | 'steps' | 'chatWith'
 
   if (v.event && eventEnd !== undefined) {
     // Party: mingle until the evening ends, then head out.
-    const spot = { x: floor.width / 2 + (hash01(String(v.start)) - 0.5) * 2, y: floor.height / 2 + (hash01(String(v.start) + 'y') - 0.5) * 2 };
+    // Spread the party over the whole floor, not one huddle in the middle.
+    const key = v.guestId + String(v.start);
+    const spot = { x: 1.2 + hash01(key) * (floor.width - 2.4), y: 1.2 + hash01(key + 'y') * (floor.height - 2.4) };
     walk(spot);
     let flip = false;
     while (t < eventEnd - 0.6) {
@@ -116,7 +123,7 @@ export function poseAt(segs: Segment[], now: number) {
 // ---------------------------------------------------------------------------
 // Planning a visit
 
-function planSteps(state: GameState, guest: Guest, rng: Rng, max: number): VisitStep[] {
+function planSteps(state: GameState, guest: Pick<Guest, 'id' | 'likes' | 'dislikes' | 'traits'>, rng: Rng, max: number, spread = 0): VisitStep[] {
   const spots = state.floor.fixtures.filter((f) => FIXTURE[f.kind].display && f.artworkId);
   // Shuffle, then keep the first few: people wander, they don't follow a list.
   for (let i = spots.length - 1; i > 0; i--) {
@@ -125,9 +132,9 @@ function planSteps(state: GameState, guest: Guest, rng: Rng, max: number): Visit
   }
   return spots.slice(0, max).map((f) => {
     const work = state.artworks[f.artworkId!];
-    const score = tasteScore(guest, work, state.artists[work.artistId]);
+    const score = tasteScore(guest as Guest, work, state.artists[work.artistId]);
     const reaction = reactionFor(score);
-    const { at, faceLeft } = standSpot(f, state.floor, guest.id + f.id);
+    const { at, faceLeft } = standSpot(f, state.floor, guest.id + f.id, spread);
     let action: VisitStep['action'];
     if (guest.traits.includes('note-taker')) action = 'notes';
     else if (guest.traits.includes('photographer') && score >= 0.55) action = 'photo';
@@ -158,18 +165,56 @@ function arrivalChance(state: GameState, g: Guest): number {
   return perDay / (GUESTS.lastArrivalTick + 1);
 }
 
-export function hourOfGuests(state: GameState, rng: Rng): void {
+// ---------------------------------------------------------------------------
+// The public: everyone the visitor count counts, walking in one by one.
+
+const CROWD_SPRITES = GUEST_SEEDS.map((g) => g.sprite);
+/** Recolours per sprite (see render/sprites.ts). 0 is the named character's own look. */
+export const CROWD_VARIANTS = 5;
+const CROWD_TAGS = ['painting', 'portrait', 'landscape', 'colorful', 'pop', 'classic', 'quiet', 'moody', 'fantasy', 'weird', 'retro', 'digital', 'sculpture', 'figurative'];
+
+/** One ordinary visitor: a stranger with a couple of passing tastes. */
+function crowdVisit(state: GameState, start: number, rng: Rng, event = false): GuestVisit {
+  const id = `c${state.nextId++}`;
+  const look = { sprite: rng.pick(CROWD_SPRITES), variant: 1 + Math.floor(rng.next() * (CROWD_VARIANTS - 1)) };
+  const stranger = {
+    id,
+    likes: [rng.pick(CROWD_TAGS), rng.pick(CROWD_TAGS)],
+    dislikes: [rng.pick(CROWD_TAGS)],
+    traits: rng.chance(0.15) ? ['photographer'] : [],
+  };
+  const steps = planSteps(state, stranger, rng, event ? (rng.chance(0.5) ? 1 : 0) : 1 + Math.floor(rng.next() * 3), 1.6);
+  const v: GuestVisit = { guestId: id, start, end: 0, steps, look, event: event || undefined };
+  if (event) v.end = eventEndHour(state);
+  else {
+    const segs = visitTimeline(v, state.floor);
+    v.end = segs[segs.length - 1].end;
+  }
+  return v;
+}
+
+/** Puts `n` members of the public on the floor, arriving across the coming hour. */
+export function crowdArrives(state: GameState, n: number, rng: Rng, event = false): void {
+  const now = shownHour(state);
+  for (let i = 0; i < n; i++) state.visits.push(crowdVisit(state, now + rng.next() * (event ? 0.6 : 0.95), rng, event));
+}
+
+export function hourOfGuests(state: GameState, rng: Rng, publicArrivals = 0): void {
   const now = shownHour(state);
   // Leavers first, so their effects land as they walk out.
   for (const v of state.visits.filter((v) => v.end <= now)) resolveVisit(state, v, rng);
   state.visits = state.visits.filter((v) => v.end > now);
 
+  crowdArrives(state, publicArrivals, rng);
   if (state.tick > GUESTS.lastArrivalTick) return;
   for (const g of Object.values(state.guests)) {
     if (state.visits.some((v) => v.guestId === g.id)) continue;
     if (!rng.chance(arrivalChance(state, g))) continue;
     g.lastVisitDay = state.day;
     state.visits.push(makeVisit(state, g, now + rng.next() * 0.8, rng));
+    // Named guests are visitors too: they count, and in a museum they buy a ticket.
+    state.today.visitors += 1;
+    if (state.venue === 'museum' && state.settings.ticketPrice > 0) post(state, 'tickets', state.settings.ticketPrice, 'Ticket sales', true);
   }
 }
 
@@ -260,7 +305,9 @@ export function resolveVisit(state: GameState, v: GuestVisit, rng: Rng): void {
 // ---------------------------------------------------------------------------
 // Events: regulars come to parties, and the wine and cheese matter to them.
 
-export function eventGuests(state: GameState, event: ScheduledEvent, satisfaction: number, rng: Rng): void {
+/** Fills the floor for the event: named guests who come, plus enough of the public to match `attendance`. */
+export function eventGuests(state: GameState, event: ScheduledEvent, satisfaction: number, rng: Rng, attendance = 0): void {
+  let named = 0;
   const now = shownHour(state);
   const dayEnd = (state.day - 1) * TIME.ticksPerDay + TIME.ticksPerDay;
   const { wine, cheese } = event.hospitality;
@@ -298,7 +345,9 @@ export function eventGuests(state: GameState, event: ScheduledEvent, satisfactio
       if (work.status === 'display' && work.price <= g.budget && work.price <= work.value * g.priceTolerance) sellArtwork(state, work, `to ${name} at the ${event.kind}`, g.id);
     }
     state.visits.push({ guestId: g.id, start: now + rng.next() * 0.5, end: dayEnd, steps, event: true });
+    named++;
   }
+  crowdArrives(state, Math.max(0, attendance - named), rng, true);
   for (const r of reactions.slice(0, 3)) notify(state, { kind: 'guest', text: r });
 }
 

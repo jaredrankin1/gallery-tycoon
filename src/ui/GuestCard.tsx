@@ -22,7 +22,7 @@ export function GuestCard({ id }: { id: string }) {
   const { state, store, setUi } = useGame();
   const g = state.guests[id];
   const visit = state.visits.find((v) => v.guestId === id);
-  if (!g) return null;
+  if (!g && !visit) return null;
 
   let doing = 'Heading out';
   if (visit) {
@@ -33,6 +33,18 @@ export function GuestCard({ id }: { id: string }) {
       doing = work && pose.seg.anim !== 'walk' ? `${DOING[pose.seg.anim]} “${work.title}”` : visit.event && pose.seg.anim !== 'walk' ? 'Mingling at the party' : DOING[pose.seg.anim];
     }
   }
+
+  if (!g)
+    return (
+      <div class="inspector guest-card">
+        <button class="icon-btn corner" onClick={() => setUi({ guest: null })} aria-label="Close">
+          <Icon name="close" size={18} />
+        </button>
+        <h3>A visitor</h3>
+        <p class="doing">{doing}</p>
+        <small class="muted">{visit?.event ? 'Here for tonight’s party.' : `One of ${state.today.visitors} visitors today.`} You don’t know them yet.</small>
+      </div>
+    );
 
   return (
     <div class="inspector guest-card">

@@ -240,6 +240,8 @@ export interface GuestVisit {
   chatWith?: Id;
   /** Came for tonight's event. */
   event?: boolean;
+  /** Set for an ordinary member of the public (not one of the named guests): which sprite, and which recolour. */
+  look?: { sprite: string; variant: number };
 }
 
 export interface GameState {

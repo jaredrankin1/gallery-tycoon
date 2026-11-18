@@ -84,7 +84,7 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
     text: `${EVENT_KIND[event.kind].label}: ${attendance} came, catered for ${guests}. ${verdict}`,
   });
   for (const n of notes) notify(state, { kind: 'artist', text: n });
-  eventGuests(state, event, satisfaction, rng);
+  eventGuests(state, event, satisfaction, rng, attendance);
   state.today.visitors += attendance;
 
   return {

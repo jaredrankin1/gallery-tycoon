@@ -58,6 +58,8 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
   // ---- canvas ----
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<IsoRenderer | null>(null);
+  /** People on the floor right now, as drawn: the HUD count is exactly who you can see. */
+  const [inside, setInside] = useState(0);
   useEffect(() => {
     const r = new IsoRenderer(canvasRef.current!, (x, y) => {
       const u = uiRef.current;
@@ -83,6 +85,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
       setUi({ guest: u.guest === guestId ? null : guestId, selected: null, sheet: null });
     });
     r.setClock(() => absHour(store.state) + store.hourProgress);
+    r.setOnCount(setInside);
     rendererRef.current = r;
     return () => r.destroy();
   }, []);
@@ -188,9 +191,9 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
                 <Icon name="star" size={14} />
                 {Math.round(state.reputation)}
               </span>
-              <span class="mini" title="Visitors today">
+              <span class="mini" title={`In the building now · ${state.today.visitors} today`}>
                 <Icon name="people" size={14} />
-                {state.today.visitors}
+                {inside}
               </span>
             </div>
             <div class="speed" role="group" aria-label="Game speed">

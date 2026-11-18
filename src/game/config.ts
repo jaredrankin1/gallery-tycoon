@@ -171,9 +171,9 @@ export const FLOOR_SIZE: Record<VenueType, { width: number; height: number }> = 
 
 /** Named guests: how they move and how much they matter. Durations are in game hours. */
 export const GUESTS = {
-  walkTilesPerHour: 3.2,
-  lookHours: 0.9,
-  reactHours: 0.6,
+  walkTilesPerHour: 6,
+  lookHours: 0.6,
+  reactHours: 0.4,
   actionHours: 0.7,
   chatHours: 1.1,
   /** Score thresholds for reactions (0..1). */

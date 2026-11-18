@@ -33,8 +33,10 @@ export function stepHour(state: GameState, rng: Rng): void {
   if (state.status !== 'playing') return;
   const venue = getVenueModel(state.venue);
 
-  state.today.visitors += venue.hour(state, rng);
-  hourOfGuests(state, rng);
+  // Everyone counted here walks in as a person on the floor.
+  const arrivals = venue.hour(state, rng);
+  state.today.visitors += arrivals;
+  hourOfGuests(state, rng, arrivals);
 
   if (state.tick === TIME.eventTick) {
     const tonight = state.events.filter((e) => e.day === state.day);

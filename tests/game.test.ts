@@ -202,3 +202,23 @@ describe('paintings', () => {
     if (tagged) expect(workTags(tagged, s.artists[tagged.artistId])).toEqual(expect.arrayContaining(tagged.tags!));
   });
 });
+
+describe('one person per visitor', () => {
+  for (const venue of ['gallery', 'museum'] as const) {
+    it(`every ${venue} visitor counted walks in`, () => {
+      let s = createNewGame({ name: 'x', difficulty: 'easy', venue, seed: 21 });
+      for (const w of offers(s).slice(0, 4)) {
+        s = run(s, { type: 'buyArtwork', artworkId: w.id });
+        s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+      }
+      s = days(s, 1);
+      const seen = new Set<string>();
+      for (let h = 0; h < TIME.ticksPerDay - 1; h++) {
+        s = run(s, { type: 'tick', hours: 1 });
+        for (const v of s.visits) seen.add(`${v.guestId}@${v.start}`);
+      }
+      expect(s.today.visitors).toBeGreaterThan(3);
+      expect(seen.size).toBe(s.today.visitors);
+    });
+  }
+});
