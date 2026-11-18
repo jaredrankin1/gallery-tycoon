@@ -42,7 +42,7 @@ FRAMES = {
         'walk': [(540, 440), (648, 440), (742, 440), (840, 440), (942, 440)],
         'look': [(420, 620), (560, 620)],
         'think': [(295, 800), (1085, 620)],
-        'impressed': [(840, 620), (965, 620), (1450, 620)],
+        'impressed': [(840, 620), (965, 620)],
         'disapprove': [(1325, 620), (1210, 620)],
         'photo': [(630, 800), (785, 800), (945, 800)],
         'notes': [(60, 620), (185, 620), (300, 620)],
@@ -56,15 +56,15 @@ FRAMES = {
         'impressed': [(700, 780)],  # pointing it out
         'disapprove': [(1195, 600)],  # arms crossed
         'photo': [(210, 780), (365, 780), (520, 780)],
-        'notes': [(65, 600), (190, 600), (325, 600), (475, 600)],
+        'notes': [(190, 600), (325, 600), (475, 600)],
         'chat': [(1465, 600)],
     },
     'hana': {
         'idle': [(60, 425), (143, 425), (225, 425), (317, 425)],
         'walk': [(425, 425), (533, 425), (636, 425), (737, 425), (840, 425), (943, 425)],
         'look': [(505, 790)],  # magnifying glass
-        'think': [(1020, 610), (1143, 610)],
-        'impressed': [(1365, 610), (1475, 610)],
+        'think': [(1020, 610)],
+        'impressed': [(1365, 610)],
         'disapprove': [(1265, 610)],
         'photo': [(75, 790), (215, 790), (355, 790)],
         'notes': [(237, 610), (337, 610), (450, 610), (575, 610)],
@@ -83,6 +83,14 @@ FRAMES = {
         'crossed': [(1130, 575)],
         'look': [(875, 575)],
     },
+}
+# Poses the sheets draw from the waist up. They get legs from the standing frame.
+WAIST_UP = {
+    'sunny': [(1330, 580), (1465, 580)],
+    'beatrix': [(420, 620), (560, 620), (1085, 620), (840, 620), (965, 620), (1325, 620), (1210, 620), (60, 620), (185, 620), (300, 620), (710, 620)],
+    'kofi': [(1063, 600), (1320, 600), (925, 600), (1195, 600), (1465, 600)],
+    'hana': [(1365, 610), (1265, 610), (1100, 790), (1240, 790)],
+    'assistant': [(68, 578), (205, 578), (343, 578), (480, 578), (620, 578), (740, 580), (1000, 575), (1250, 575), (1420, 575), (1130, 575), (875, 575)],
 }
 # (left, top, side) of the square portrait crop.
 PORTRAIT = {'sunny': (12, 10, 300), 'beatrix': (12, 24, 300), 'kofi': (8, 10, 296), 'hana': (14, 14, 268), 'assistant': (10, 6, 300)}
@@ -120,9 +128,54 @@ def frame_at(rgb, lab, sizes, boxes, pt):
     return Image.fromarray(rgba, 'RGBA')
 
 
+def add_legs(frame, idle):
+    """A waist-up pose, drawn a little larger, on top of the legs of a standing frame.
+
+    Finds the scale and offset where the head and shoulders best overlap the
+    standing frame's, then draws the standing frame's lower body underneath.
+    """
+    ia = np.asarray(idle)[:, :, 3] > 0
+    best = None
+    for s in np.linspace(0.6, 1.1, 26):
+        w, h = max(1, round(frame.width * s)), max(1, round(frame.height * s))
+        if h >= idle.height:
+            continue
+        fa = np.asarray(frame.resize((w, h), Image.NEAREST))[:, :, 3] > 0
+        top = max(8, int(h * 0.38))  # head and shoulders: arms move, these don't
+        for dx in range(-w, idle.width):
+            a = fa[:top]
+            x0, x1 = max(0, dx), min(idle.width, dx + w)
+            if x1 - x0 < w * 0.4:
+                continue
+            fa_c = a[:, x0 - dx:x1 - dx]
+            ia_c = ia[:top, x0:x1]
+            inter = (fa_c & ia_c).sum()
+            union = a.sum() + ia[:top].sum() - inter
+            score = inter / max(1, union)
+            if best is None or score > best[0]:
+                best = (score, s, dx, w, h)
+    _, s, dx, w, h = best
+    scaled = frame.resize((w, h), Image.LANCZOS)
+    left = min(0, dx)
+    W = max(idle.width, dx + w) - left
+    out = Image.new('RGBA', (W, idle.height), (0, 0, 0, 0))
+    cut = h - 3  # overlap a few rows so there's no seam
+    legs = idle.crop((0, cut, idle.width, idle.height))
+    out.paste(legs, (-left, cut), legs)
+    out.paste(scaled, (dx - left, 0), scaled)
+    return out
+
+
 def build(name):
     rgb, lab, sizes, boxes = figures(name)
-    frames = {a: [frame_at(rgb, lab, sizes, boxes, p) for p in pts] for a, pts in FRAMES[name].items()}
+    idle = frame_at(rgb, lab, sizes, boxes, FRAMES[name]['idle'][0])
+    waist = set(WAIST_UP.get(name, []))
+
+    def get(p):
+        f = frame_at(rgb, lab, sizes, boxes, p)
+        return add_legs(f, idle) if p in waist else f
+
+    frames = {a: [get(p) for p in pts] for a, pts in FRAMES[name].items()}
     order = ORDER if set(frames) == set(ORDER) else list(frames)
     all_f = [f for fs in frames.values() for f in fs]
     cw = max(f.width for f in all_f)
