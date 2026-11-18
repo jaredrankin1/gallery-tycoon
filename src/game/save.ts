@@ -1,6 +1,6 @@
 import type { GameState } from './types';
 
-const KEY = 'agt.save.v3';
+const KEY = 'agt.save.v4';
 
 export function saveGame(state: GameState): void {
   try {
@@ -15,7 +15,7 @@ export function loadGame(): GameState | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
-    return parsed.version === 3 ? parsed : null; // add migrations here when the shape changes
+    return parsed.version === 4 ? parsed : null; // add migrations here when the shape changes
   } catch {
     return null;
   }

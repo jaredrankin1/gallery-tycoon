@@ -1,4 +1,4 @@
-import { DIFFICULTY, RULES, TIME } from '../config';
+import { DIFFICULTY, RULES, trafficShare } from '../config';
 import { clamp } from '../rng';
 import { adjustRelationship } from '../systems/artists';
 import { notify } from '../systems/feed';
@@ -50,15 +50,17 @@ export const galleryModel: VenueModel = {
 
   expectedDailyVisitors(state) {
     return Math.round(
-      (5 + displayed(state).length * 1.5) * (0.5 + state.reputation / 50) * DIFFICULTY[state.difficulty].demandMultiplier + state.buzz,
+      ((5 + displayed(state).length * 1.5) * (0.5 + state.reputation / 50) * DIFFICULTY[state.difficulty].demandMultiplier + state.buzz) *
+        RULES.galleryFootfall,
     );
   },
 
   hour(state, rng) {
     for (const work of displayed(state)) {
-      if (rng.chance(saleChance(state, work, 1) / TIME.ticksPerDay)) sellArtwork(state, work, 'off the floor');
+      // Sales follow footfall: most happen in the afternoon, none at 3 AM.
+      if (rng.chance(saleChance(state, work, 1) * trafficShare(state.tick))) sellArtwork(state, work, 'off the floor');
     }
-    const exp = galleryModel.expectedDailyVisitors(state) / TIME.ticksPerDay;
+    const exp = galleryModel.expectedDailyVisitors(state) * trafficShare(state.tick);
     return Math.floor(exp + rng.next());
   },
 

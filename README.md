@@ -24,14 +24,17 @@ The first run is guided: you see the empty room right away, and Marisol (your
 gallery assistant) walks you through gallery or museum, where the money comes from,
 and the name, one choice at a time. The room behind updates as you pick.
 
-The game runs in real time. A day lasts about 20 seconds at normal speed, and
-you can pause or play at 1x, 2x or 4x from the top bar. Doors open at 10 AM
-and each hour is one simulation step.
+The game runs on a continuous 24-hour clock, like other tycoon games: days just
+tick by. Each hour is one simulation step (about 1.6 seconds at 1x), and you can
+pause or play at 1x, 2x or 4x from the top bar. A new game starts at 10 AM.
+Footfall follows the time of day: busy afternoons, a trickle in the evening and
+almost nobody overnight, when the clock runs three times faster and the room
+goes dark.
 
 - **Art**: buy works that turn up on the market each day. There are 40 real paintings across seven painters, plus sculpture and installation pieces. Artists who like you offer more often and give a discount.
 - **Floor**: tap a wall spot or pedestal to hang art, set its price (gallery) or take it down. Tap a painting on the wall to inspect it.
 - **Build**: wall spots, pedestals, a wine bar, benches and plants on the isometric grid, with a live placement preview.
-- **Marisol**, your gallery assistant, works the floor: dusting the art, talking visitors through pieces, clipboard rounds, greeting at the door. She cheers every sale and sees everyone out at closing.
+- **Marisol**, your gallery assistant, works the floor: dusting the art, talking visitors through pieces, clipboard rounds, greeting at the door. She cheers every sale and keeps watch by the door overnight.
 - **Crowd**: every visitor the game counts walks in as a person, one for one. Members of the public wear recoloured outfits so they never pass for the named characters; the people icon in the top bar is exactly how many are on the floor right now. Events fill the room with their whole attendance.
 - **Visitors**: twelve named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
 - **Artists** (under People): studio visits build relationships, and neglect cools them. "Give a show" opens the event planner with that artist already picked.
@@ -43,9 +46,9 @@ happen, and sales pop floating "+$" labels over the painting. Rent and staff
 are paid every Sunday night. If cash drops below the overdraft limit, the
 doors close.
 
-At 9 PM the doors shut to new visitors and everyone still browsing heads for
-the exit, so the room is empty by 10 PM. Party guests stay for the event and
-leave in time too.
+There is no closing time. Visitors who arrive late simply finish their visit
+after midnight and walk out the door, and party guests leave a few hours after
+the event starts.
 
 ## Layout
 

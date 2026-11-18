@@ -107,7 +107,7 @@ export class IsoRenderer {
     const first = !this.state || this.state.floor.width !== state.floor.width;
     this.state = state;
     if (first) this.pan = { x: 0, y: 0 };
-    const live = new Set(state.visits.map((v) => `${v.guestId}@${v.start}@${v.leaveBy ?? ''}`));
+    const live = new Set(state.visits.map((v) => `${v.guestId}@${v.start}`));
     for (const k of this.timelines.keys()) if (!live.has(k)) this.timelines.delete(k);
     this.layout();
   }
@@ -323,10 +323,11 @@ export class IsoRenderer {
 
     ctx.restore();
 
-    // Evening light: warm dim as the day closes, warmer during a party.
-    const dusk = Math.max(0, (s.tick - (TIME.ticksPerDay - 5)) / 5);
+    // Daylight: dims from late afternoon, dark overnight, back up at dawn. A party glows warmer.
+    const hour = (((now % TIME.ticksPerDay) + TIME.ticksPerDay) % TIME.ticksPerDay) + TIME.openHour;
+    const dusk = hour >= 17 ? Math.min(1, (hour - 17) / 4) : hour < 5 ? 1 : hour < 8 ? 1 - (hour - 5) / 3 : 0;
     if (dusk > 0) {
-      ctx.fillStyle = this.partyNow() ? `rgba(70, 30, 60, ${0.22 * dusk})` : `rgba(20, 24, 60, ${0.28 * dusk})`;
+      ctx.fillStyle = this.partyNow() ? `rgba(70, 30, 60, ${0.22 * dusk})` : `rgba(14, 18, 52, ${0.42 * dusk})`;
       ctx.fillRect(0, 0, cw, ch);
     }
   }
@@ -519,7 +520,7 @@ export class IsoRenderer {
   }
 
   private timeline(v: GuestVisit): Segment[] {
-    const key = `${v.guestId}@${v.start}@${v.leaveBy ?? ''}`;
+    const key = `${v.guestId}@${v.start}`;
     let segs = this.timelines.get(key);
     if (!segs) {
       segs = visitTimeline(v, this.state!.floor);

@@ -6,7 +6,7 @@ import { createFloor } from './systems/floor';
 import { GUEST_SEEDS } from '../data/guests';
 import { refreshMarket } from './systems/market';
 import { emptyDay } from './clock';
-import { RULES } from './config';
+import { RULES, TIME } from './config';
 
 export interface NewGameOptions {
   name: string;
@@ -23,12 +23,12 @@ export function createNewGame(opts: NewGameOptions): GameState {
   }
 
   const state: GameState = {
-    version: 3,
+    version: 4,
     name: opts.name.trim() || (opts.venue === 'museum' ? 'The New Museum' : 'Untitled Gallery'),
     difficulty: opts.difficulty,
     venue: opts.venue,
     day: 1,
-    tick: 0,
+    tick: TIME.startTick,
     cash: diff.startingCash,
     reputation: diff.startingReputation,
     settings: { ticketPrice: VENUE[opts.venue].defaultTicketPrice, defaultMarkup: 1.3 },

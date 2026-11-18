@@ -1,4 +1,4 @@
-import { DIFFICULTY, FIXTURE_EFFECTS, RULES, TIME } from '../config';
+import { DIFFICULTY, FIXTURE_EFFECTS, RULES, TIME, trafficShare } from '../config';
 import { clamp } from '../rng';
 import { notify } from '../systems/feed';
 import { countFixtures } from '../systems/floor';
@@ -13,9 +13,9 @@ export function collectionAppeal(state: GameState): number {
     .reduce((sum, w) => sum + 0.2 + (state.artists[w.artistId]?.fame ?? 0) / 100, 0);
 }
 
-/** Ticket price elasticity: ~1.0 at $15, falls off as price climbs. */
+/** Ticket price elasticity: ~1.1 at $20, falls off as price climbs. */
 export function priceDemand(ticketPrice: number): number {
-  return clamp(1.6 - ticketPrice / 25, 0.05, 1.6);
+  return clamp(1.6 - ticketPrice / 40, 0.05, 1.6);
 }
 
 export const museumModel: VenueModel = {
@@ -34,7 +34,7 @@ export const museumModel: VenueModel = {
   },
 
   hour(state, rng) {
-    const exp = museumModel.expectedDailyVisitors(state) / TIME.ticksPerDay;
+    const exp = museumModel.expectedDailyVisitors(state) * trafficShare(state.tick);
     const visitors = Math.floor(exp * rng.range(0.8, 1.2) + rng.next());
     if (visitors > 0 && state.settings.ticketPrice > 0) {
       post(state, 'tickets', visitors * state.settings.ticketPrice, 'Ticket sales', true);

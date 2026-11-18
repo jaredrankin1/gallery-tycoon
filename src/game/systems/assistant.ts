@@ -1,4 +1,4 @@
-import { GUESTS, TIME } from '../config';
+import { GUESTS, isNight, TIME } from '../config';
 import type { FloorPlan, GameState } from '../types';
 import { hash01 } from './taste';
 import { standSpot } from './visits';
@@ -54,10 +54,10 @@ function jobFor(state: GameState, n: number): Job {
 export function assistantPose(state: GameState, now: number): AssistantPose {
   const floor = state.floor;
   const hourOfDay = now - Math.floor(now / TIME.ticksPerDay) * TIME.ticksPerDay;
-  // Closing time: she sees everyone out from the door.
-  if (hourOfDay >= TIME.closingTick + 1 || state.visits.some((v) => v.leaveBy !== undefined && !v.event)) {
+  // Night shift: she keeps watch by the door, checking in on the radio now and then.
+  if (isNight(Math.floor(hourOfDay))) {
     const at = doorPost(floor);
-    return { ...at, anim: 'wave', faceLeft: false, local: now };
+    return { ...at, anim: hash01(`marisol-n${Math.floor(now)}`) < 0.3 ? 'radio' : 'idle', faceLeft: false, local: now };
   }
   const n = Math.floor(now / SHIFT);
   const prev = jobFor(state, n - 1);

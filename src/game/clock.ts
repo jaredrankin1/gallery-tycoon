@@ -5,7 +5,7 @@ import { resolveEvent } from './systems/events';
 import { notify } from './systems/feed';
 import { post } from './systems/ledger';
 import { refreshMarket } from './systems/market';
-import { closeForTheNight, hourOfGuests } from './systems/visits';
+import { hourOfGuests } from './systems/visits';
 import type { DayReport, GameState } from './types';
 import { getVenueModel } from './venues';
 
@@ -27,15 +27,16 @@ export function clockLabel(tick: number): string {
  * Order within an hour:
  *  1. Normal trading (sales roll or tickets trickle in)
  *  2. At 7 PM, tonight's event
- *  3. At closing: bills (weekly), artist drift, market refresh, day report
+ *  3. At midnight: bills (weekly), artist drift, market refresh, day report.
+ *     Nobody is sent home: visits carry on past midnight.
  */
 export function stepHour(state: GameState, rng: Rng): void {
   if (state.status !== 'playing') return;
   const venue = getVenueModel(state.venue);
 
-  // Everyone counted here walks in as a person on the floor.
-  // After closing time the doors are shut: no new visitors, no trade.
-  const arrivals = state.tick >= TIME.closingTick ? 0 : venue.hour(state, rng);
+  // Everyone counted here walks in as a person on the floor. The doors never
+  // close; how many come depends on the hour (see trafficShare).
+  const arrivals = venue.hour(state, rng);
   state.today.visitors += arrivals;
   hourOfGuests(state, rng, arrivals);
 
@@ -66,7 +67,6 @@ function endOfDay(state: GameState, rng: Rng): void {
   }
 
   endOfDayArtists(state);
-  closeForTheNight(state, rng);
   state.buzz *= GUESTS.buzzDecay;
 
   state.history.push(state.today);

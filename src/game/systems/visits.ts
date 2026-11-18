@@ -1,4 +1,4 @@
-import { FIXTURE, GUESTS, TIME } from '../config';
+import { FIXTURE, GUESTS, TIME, trafficShare } from '../config';
 import { clamp, type Rng } from '../rng';
 import { GUEST_SEEDS } from '../../data/guests';
 import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, ScheduledEvent, VisitStep } from '../types';
@@ -59,36 +59,18 @@ export interface Segment {
 const leftward = (a: { x: number; y: number }, b: { x: number; y: number }) => b.x - a.x - (b.y - a.y) < 0;
 
 export function visitTimeline(
-  v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatWith' | 'event' | 'leaveBy'>,
+  v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatWith' | 'event'>,
   floor: FloorPlan,
   eventEnd?: number,
 ): Segment[] {
-  // A party runs to the end of the day the guest arrived on.
-  if (v.event && eventEnd === undefined) eventEnd = (Math.floor(v.start / TIME.ticksPerDay) + 1) * TIME.ticksPerDay;
-  const segs = planTimeline(v, floor, eventEnd);
-  if (v.leaveBy === undefined) return segs;
-  // Closing time: wherever they are at leaveBy, they stop and walk out.
-  // They hurry if they must, so nobody is still inside when the doors lock.
-  const lock = (Math.floor(v.leaveBy / TIME.ticksPerDay) + 1) * TIME.ticksPerDay - 0.05;
-  const k = segs.findIndex((s) => s.end > v.leaveBy!);
-  if (k < 0) return segs; // already gone
-  if (k === segs.length - 1) {
-    // Already on the way out.
-    const last = segs[k];
-    if (last.end > lock) segs[k] = { ...last, end: Math.max(last.start + 0.05, lock) };
-    return segs;
-  }
-  const cut = segs.slice(0, k);
-  const s = segs[k];
-  const f = s.end > s.start ? clamp((v.leaveBy - s.start) / (s.end - s.start), 0, 1) : 1;
-  const at = { x: s.from.x + (s.to.x - s.from.x) * f, y: s.from.y + (s.to.y - s.from.y) * f };
-  const start = Math.max(v.leaveBy, s.start);
-  if (start > s.start) cut.push({ ...s, end: start, to: at });
-  const to = door(floor);
-  const dur = Math.min(Math.hypot(to.x - at.x, to.y - at.y) / GUESTS.walkTilesPerHour, Math.max(0.05, lock - start));
-  if (dur > 0.001) cut.push({ anim: 'walk', start, end: start + dur, from: at, to, faceLeft: leftward(at, to) });
-  return cut;
+  // A party runs from the evening's event until PARTY_HOURS later.
+  if (v.event && eventEnd === undefined) eventEnd = partyEndFor(v.start);
+  return planTimeline(v, floor, eventEnd);
 }
+
+/** Parties wind down this many hours after the event starts. */
+const PARTY_HOURS = 4;
+const partyEndFor = (start: number) => Math.floor(start / TIME.ticksPerDay) * TIME.ticksPerDay + TIME.eventTick + 1 + PARTY_HOURS;
 
 function planTimeline(v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatWith' | 'event'>, floor: FloorPlan, eventEnd?: number): Segment[] {
   const segs: Segment[] = [];
@@ -194,13 +176,13 @@ function makeVisit(state: GameState, guest: Guest, start: number, rng: Rng): Gue
 // ---------------------------------------------------------------------------
 // Hourly: who walks in, who leaves
 
-/** Chance per open hour that this guest drops in. */
+/** Chance this hour that this guest drops in: their visits per day, spread like everyone else's over the day. */
 function arrivalChance(state: GameState, g: Guest): number {
   if (state.reputation < g.minReputation) return 0;
   if (g.lastVisitDay === state.day) return 0;
   const hasArt = state.floor.fixtures.some((f) => f.artworkId);
   const perDay = (g.visitsPerWeek / 7) * clamp(1 + g.affinity / 80, 0.15, 2.2) * (hasArt ? 1 : 0.35);
-  return perDay / (GUESTS.lastArrivalTick + 1);
+  return perDay * trafficShare(state.tick + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +208,7 @@ function crowdVisit(state: GameState, start: number, rng: Rng, event = false): G
   };
   const steps = planSteps(state, stranger, rng, event ? (rng.chance(0.5) ? 1 : 0) : 1 + Math.floor(rng.next() * 3), 1.6);
   const v: GuestVisit = { guestId: id, start, end: 0, steps, look, event: event || undefined };
-  const segs = visitTimeline(v, state.floor, event ? eventEndHour(state) : undefined);
+  const segs = visitTimeline(v, state.floor);
   v.end = segs[segs.length - 1].end;
   return v;
 }
@@ -237,32 +219,13 @@ export function crowdArrives(state: GameState, n: number, rng: Rng, event = fals
   for (let i = 0; i < n; i++) state.visits.push(crowdVisit(state, now + rng.next() * (event ? 0.6 : 0.95), rng, event));
 }
 
-/** Doors shut to new visitors: everyone browsing wraps up and heads for the exit. */
-function closingTime(state: GameState, rng: Rng): void {
-  const now = shownHour(state);
-  let n = 0;
-  for (const v of state.visits) {
-    if (v.event || v.leaveBy !== undefined) continue;
-    v.leaveBy = now + rng.next() * 0.25;
-    const segs = visitTimeline(v, state.floor);
-    v.end = segs[segs.length - 1].end;
-    n++;
-  }
-  if (n) notify(state, { kind: 'guest', text: `Closing time. ${n === 1 ? 'Your last visitor is' : `${n} visitors are`} heading out.` });
-}
-
 export function hourOfGuests(state: GameState, rng: Rng, publicArrivals = 0): void {
   const now = shownHour(state);
   // Leavers first, so their effects land as they walk out.
   for (const v of state.visits.filter((v) => v.end <= now)) resolveVisit(state, v, rng);
   state.visits = state.visits.filter((v) => v.end > now);
 
-  if (state.tick >= TIME.closingTick) {
-    if (state.tick === TIME.closingTick) closingTime(state, rng);
-    return;
-  }
   crowdArrives(state, publicArrivals, rng);
-  if (state.tick > GUESTS.lastArrivalTick) return;
   for (const g of Object.values(state.guests)) {
     if (state.visits.some((v) => v.guestId === g.id)) continue;
     if (!rng.chance(arrivalChance(state, g))) continue;
@@ -272,12 +235,6 @@ export function hourOfGuests(state: GameState, rng: Rng, publicArrivals = 0): vo
     state.today.visitors += 1;
     if (state.venue === 'museum' && state.settings.ticketPrice > 0) post(state, 'tickets', state.settings.ticketPrice, 'Ticket sales', true);
   }
-}
-
-/** Doors close: everyone still inside finishes up. */
-export function closeForTheNight(state: GameState, rng: Rng): void {
-  for (const v of state.visits) if (!v.event) resolveVisit(state, v, rng);
-  state.visits = [];
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +322,6 @@ export function resolveVisit(state: GameState, v: GuestVisit, rng: Rng): void {
 export function eventGuests(state: GameState, event: ScheduledEvent, satisfaction: number, rng: Rng, attendance = 0): void {
   let named = 0;
   const now = shownHour(state);
-  const dayEnd = (state.day - 1) * TIME.ticksPerDay + TIME.ticksPerDay;
   const { wine, cheese } = event.hospitality;
   const reactions: string[] = [];
   for (const g of Object.values(state.guests)) {
@@ -400,17 +356,13 @@ export function eventGuests(state: GameState, event: ScheduledEvent, satisfactio
       const work = state.artworks[best.artworkId];
       if (work.status === 'display' && work.price <= g.budget && work.price <= work.value * g.priceTolerance) sellArtwork(state, work, `to ${name} at the ${event.kind}`, g.id);
     }
-    const v: GuestVisit = { guestId: g.id, start: now + rng.next() * 0.5, end: dayEnd, steps, event: true };
-    const segs = visitTimeline(v, state.floor, dayEnd);
+    const v: GuestVisit = { guestId: g.id, start: now + rng.next() * 0.5, end: 0, steps, event: true };
+    const segs = visitTimeline(v, state.floor);
     v.end = segs[segs.length - 1].end;
     state.visits.push(v);
     named++;
   }
   crowdArrives(state, Math.max(0, attendance - named), rng, true);
   for (const r of reactions.slice(0, 3)) notify(state, { kind: 'guest', text: r });
-}
-
-export function eventEndHour(state: GameState): number {
-  return (state.day - 1) * TIME.ticksPerDay + TIME.ticksPerDay;
 }
 

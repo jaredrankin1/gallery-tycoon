@@ -63,7 +63,7 @@ export const VENUE: Record<VenueType, VenueConfig> = {
     label: 'Museum',
     tagline: 'Build a collection people pay to see.',
     weeklyUpkeep: 1_000,
-    defaultTicketPrice: 15,
+    defaultTicketPrice: 20,
   },
 };
 
@@ -101,20 +101,34 @@ export const EVENT_KIND: Record<EventKind, EventKindConfig> = {
 
 /** The clock. The game runs in real time; the player can pause or speed it up. */
 export const TIME = {
-  /** Hour slots per day. Doors open at OPEN_HOUR, one slot per hour. */
-  ticksPerDay: 12,
-  openHour: 10,
-  /** Slot when the day's event happens (7 PM). */
-  eventTick: 9,
-  /** From this slot the doors are shut to new visitors and everyone heads out (9 PM). */
-  closingTick: 10,
-  /** Real seconds per game day at 1x. */
-  secondsPerDay: 20,
+  /** One slot per hour, midnight to midnight. The clock never stops: no closing, no jump to morning. */
+  ticksPerDay: 24,
+  /** Hour shown for tick 0. */
+  openHour: 0,
+  /** Hour a new game starts. */
+  startTick: 10,
+  /** Hour the day's event happens (7 PM). */
+  eventTick: 19,
+  /** Real seconds per game hour at 1x, in the daytime. */
+  secondsPerHour: 1.6,
+  /** Night hours (see isNight) pass this many times faster: it's quiet, nothing to watch. */
+  nightSpeedup: 3,
   speeds: [0, 1, 2, 4] as const,
   /** Rent and staff are paid on this weekday (0 = Monday). Runs at end of day. */
   billsWeekday: 6,
   weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const,
 };
+
+/**
+ * How busy each hour is, midnight to 11 PM. A day's visitors are spread over
+ * the hours in proportion: dead at night, a lunchtime bump, busy afternoons.
+ */
+const TRAFFIC_WEIGHTS = [0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.05, 0.15, 0.35, 0.6, 0.9, 1.1, 1.3, 1.3, 1.25, 1.3, 1.35, 1.3, 1.15, 1.0, 0.8, 0.5, 0.25, 0.08];
+const TRAFFIC_SUM = TRAFFIC_WEIGHTS.reduce((a, b) => a + b, 0);
+/** Share of a day's visitors who arrive during this hour (0..23). Sums to 1. */
+export const trafficShare = (tick: number) => TRAFFIC_WEIGHTS[((tick % 24) + 24) % 24] / TRAFFIC_SUM;
+/** Hours the room is dark and empty, and the clock runs faster. */
+export const isNight = (hour: number) => hour >= 22 || hour < 7;
 
 export const RULES = {
   maxLedgerEntries: 400,
@@ -134,7 +148,9 @@ export const RULES = {
   studioVisitCost: 300,
   studioVisitGain: 6,
   /** Museum: base daily walk-ins at reputation 0 with one work on display. */
-  museumBaseVisitors: 45,
+  museumBaseVisitors: 13,
+  /** Gallery: scales everyone who wanders in to look (sales don't depend on it). */
+  galleryFootfall: 0.5,
   /** Gallery: daily chance a displayed work sells when priced at value. */
   gallerySaleChance: 0.05,
   /** Cash floor before the game ends. */
@@ -174,17 +190,16 @@ export const FLOOR_SIZE: Record<VenueType, { width: number; height: number }> = 
 /** Named guests: how they move and how much they matter. Durations are in game hours. */
 export const GUESTS = {
   walkTilesPerHour: 6,
-  lookHours: 0.6,
-  reactHours: 0.4,
-  actionHours: 0.7,
-  chatHours: 1.1,
+  lookHours: 0.45,
+  reactHours: 0.3,
+  actionHours: 0.5,
+  chatHours: 0.8,
   /** Score thresholds for reactions (0..1). */
   impressedAt: 0.62,
   thinkAt: 0.38,
   /** Works a guest looks at per visit (critics look at more). */
   worksPerVisit: 3,
   /** Last hour slot a guest will walk in (doors close at the end of the day). */
-  lastArrivalTick: 8,
   /** Daily decay of buzz from photos and posts. */
   buzzDecay: 0.85,
   /** Buzz from one post at full enthusiasm. */

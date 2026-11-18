@@ -26,10 +26,11 @@ describe('new game', () => {
 describe('clock', () => {
   it('advances hours, then days', () => {
     let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 1 });
+    expect(s.tick).toBe(TIME.startTick);
     s = run(s, { type: 'tick', hours: 3 });
-    expect([s.day, s.tick]).toEqual([1, 3]);
+    expect([s.day, s.tick]).toEqual([1, TIME.startTick + 3]);
     s = days(s, 1);
-    expect([s.day, s.tick]).toEqual([2, 3]);
+    expect([s.day, s.tick]).toEqual([2, TIME.startTick + 3]);
     expect(s.history).toHaveLength(1);
   });
 
@@ -110,7 +111,7 @@ describe('events and hospitality', () => {
       hospitality: { wine: 2, cheese: 2, guests: 40 },
     });
     expect(s.cash).toBe(cash - 400 - 40 * 18);
-    s = run(s, { type: 'tick', hours: TIME.ticksPerDay + TIME.eventTick });
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay - s.tick + TIME.eventTick });
     expect(s.events).toHaveLength(1);
     s = run(s, { type: 'tick', hours: 1 });
     expect(s.events).toHaveLength(0);
@@ -162,14 +163,6 @@ describe('guests', () => {
     expect(s.feed.some((f) => f.kind === 'guest' && f.guestId)).toBe(true);
   });
 
-  it('nobody stays overnight', () => {
-    let s = hung('gallery', 4);
-    s = run(s, { type: 'tick', hours: TIME.ticksPerDay * 3 - 1 });
-    s = run(s, { type: 'tick', hours: 1 });
-    expect(s.tick).toBe(0);
-    expect(s.visits).toHaveLength(0);
-  });
-
   it('guest visits stay deterministic for a seed', () => {
     const play = () => days(hung('museum', 9), 10);
     expect(play().guests).toEqual(play().guests);
@@ -212,10 +205,13 @@ describe('one person per visitor', () => {
         s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
       }
       s = days(s, 1);
+      s = run(s, { type: 'tick', hours: TIME.ticksPerDay - s.tick });
+      expect(s.tick).toBe(0);
+      const dayStart = (s.day - 1) * TIME.ticksPerDay;
       const seen = new Set<string>();
       for (let h = 0; h < TIME.ticksPerDay - 1; h++) {
         s = run(s, { type: 'tick', hours: 1 });
-        for (const v of s.visits) seen.add(`${v.guestId}@${v.start}`);
+        for (const v of s.visits) if (v.start >= dayStart) seen.add(`${v.guestId}@${v.start}`);
       }
       expect(s.today.visitors).toBeGreaterThan(3);
       expect(seen.size).toBe(s.today.visitors);
@@ -223,32 +219,56 @@ describe('one person per visitor', () => {
   }
 });
 
-describe('closing time', () => {
-  it('everyone walks out before the doors lock', () => {
+describe('around the clock', () => {
+  it('stays open overnight, quiet at night and busy in the afternoon', () => {
     let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'museum', seed: 8 });
     for (const w of offers(s).slice(0, 4)) {
       s = run(s, { type: 'buyArtwork', artworkId: w.id });
       s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
     }
-    s = run(s, { type: 'tick', hours: TIME.closingTick + 1 });
-    const dayEnd = TIME.ticksPerDay;
-    expect(s.visits.length).toBeGreaterThan(0);
-    for (const v of s.visits) {
-      expect(v.end).toBeLessThanOrEqual(dayEnd);
-      const segs = visitTimeline(v, s.floor);
-      const last = segs[segs.length - 1];
-      expect(last.anim).toBe('walk');
-      expect(last.to).toEqual({ x: s.floor.entrance.x + 0.5, y: s.floor.entrance.y + 0.5 });
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay - s.tick });
+    let night = 0;
+    let afternoon = 0;
+    for (let d = 0; d < 5; d++) {
+      for (let h = 0; h < TIME.ticksPerDay; h++) {
+        const before = s.today.visitors;
+        s = run(s, { type: 'tick', hours: 1 });
+        if (h < TIME.ticksPerDay - 1) {
+          const added = s.today.visitors - before;
+          if (h >= 1 && h < 6) night += added;
+          if (h >= 12 && h < 17) afternoon += added;
+        }
+      }
     }
-    expect(s.feed.some((f) => f.text.startsWith('Closing time'))).toBe(true);
+    expect(afternoon).toBeGreaterThan(night * 5);
+    expect(s.feed.some((f) => f.text.startsWith('Closing time'))).toBe(false);
+  });
+
+  it('visits carry on past midnight and still end at the door', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'museum', seed: 8 });
+    for (const w of offers(s).slice(0, 4)) {
+      s = run(s, { type: 'buyArtwork', artworkId: w.id });
+      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    }
+    let crossed = 0;
+    for (let d = 0; d < 6; d++) {
+      s = run(s, { type: 'tick', hours: TIME.ticksPerDay - s.tick });
+      const midnight = (s.day - 1) * TIME.ticksPerDay;
+      for (const v of s.visits) {
+        if (v.start < midnight) crossed++;
+        const segs = visitTimeline(v, s.floor);
+        expect(segs[segs.length - 1].to).toEqual({ x: s.floor.entrance.x + 0.5, y: s.floor.entrance.y + 0.5 });
+      }
+    }
+    expect(crossed).toBeGreaterThan(0);
   });
 });
 
 describe('gallery assistant', () => {
-  it('works the floor during the day and waves people out at closing', () => {
+  it('works the floor by day and keeps watch by the door at night', () => {
     const s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 3 });
     const anims = new Set<string>();
-    for (let h = 0; h < TIME.closingTick; h += 0.1) {
+    for (let h = 8; h < 21; h += 0.1) {
       const p = assistantPose(s, h);
       expect(p.x).toBeGreaterThan(0);
       expect(p.y).toBeGreaterThan(0);
@@ -258,6 +278,9 @@ describe('gallery assistant', () => {
     }
     expect(anims.size).toBeGreaterThan(2);
     expect(assistantPose(s, 4.2)).toEqual(assistantPose(s, 4.2));
-    expect(assistantPose(s, TIME.closingTick + 1.5).anim).toBe('wave');
+    const a = assistantPose(s, 2.5);
+    const b = assistantPose(s, 3.5);
+    expect([a.x, a.y]).toEqual([b.x, b.y]);
+    expect(['idle', 'radio']).toContain(a.anim);
   });
 });

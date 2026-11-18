@@ -31,9 +31,12 @@ export function atlas(name: string): HTMLImageElement {
 const VARIANT_HUE = [0, 75, 150, 215, 290];
 const variants = new Map<string, HTMLCanvasElement | HTMLImageElement>();
 
-/** Rough skin test, so recoloured strangers don't turn green. */
+/**
+ * Skin, hair and shadow: every warm tone at any brightness, plus near-black.
+ * Only clothes in other colours get recoloured, so darker skin never turns blue or green.
+ */
 function isSkin(h: number, s: number, v: number) {
-  return h >= 5 && h <= 50 && s >= 0.18 && s <= 0.68 && v >= 0.35;
+  return v < 0.22 || ((h <= 55 || h >= 340) && s >= 0.1);
 }
 
 function rgbToHsv(r: number, g: number, b: number): [number, number, number] {

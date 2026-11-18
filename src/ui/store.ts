@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { dispatch, saveGame, TIME, type Action, type GameState } from '../game';
+import { dispatch, isNight, saveGame, TIME, type Action, type GameState } from '../game';
 
 type Listener = () => void;
 
@@ -51,11 +51,13 @@ export class Store {
   }
 
   start() {
-    const secondsPerHour = TIME.secondsPerDay / TIME.ticksPerDay;
     const loop = (t: number) => {
       const dt = this.last ? Math.min(0.25, (t - this.last) / 1000) : 0;
       this.last = t;
       if (this.speed > 0 && this.state.status === 'playing') {
+        // Quiet night hours fly by; daytime runs at the normal pace.
+        const hour = (TIME.openHour + this.state.tick) % 24;
+        const secondsPerHour = TIME.secondsPerHour / (isNight(hour) ? TIME.nightSpeedup : 1);
         this.carry += (dt * this.speed) / secondsPerHour;
         const hours = Math.floor(this.carry);
         if (hours > 0) {
