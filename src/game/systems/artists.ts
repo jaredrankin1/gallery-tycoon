@@ -1,6 +1,7 @@
 import { RULES } from '../config';
 import { clamp } from '../rng';
 import type { Artist, GameState, Id } from '../types';
+import { addFame } from './careers';
 import { notify } from './feed';
 
 /** Applies a relationship change scaled by the artist's temperament. Returns the actual delta. */
@@ -27,14 +28,13 @@ export function friendDiscount(artist: Artist): number {
   return clamp(artist.relationship / 100, 0, 1) * 0.15;
 }
 
-/** Fair value for a new work by this artist, before randomness. */
-export function baseWorkValue(artist: Artist): number {
-  return 2_000 + Math.pow(artist.fame, 1.6) * 60;
-}
+export { baseWorkValue } from './careers';
 
 /** End-of-day drift: neglect cools relationships, fame grows with exposure. */
 export function endOfDayArtists(state: GameState): void {
   for (const artist of Object.values(state.artists)) {
+    // Patrons are in touch every week.
+    if (artist.patron) artist.lastContactDay = state.day;
     const quietDays = state.day - artist.lastContactDay;
     if (quietDays > RULES.neglectAfterDays && artist.relationship > 0) {
       const before = artist.relationship;
@@ -44,6 +44,6 @@ export function endOfDayArtists(state: GameState): void {
       }
     }
     const onDisplay = Object.values(state.artworks).filter((w) => w.artistId === artist.id && w.status === 'display').length;
-    if (onDisplay > 0) artist.fame = clamp(artist.fame + 0.015 * onDisplay * (state.reputation / 50), 0, 100);
+    if (onDisplay > 0) addFame(state, artist.id, 0.015 * onDisplay * (state.reputation / 50));
   }
 }

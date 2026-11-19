@@ -14,3 +14,6 @@ export { canPlace, fixtureAt, displayFixtures } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
 export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';
+export { careerStage, potentialStars, isScouted, stageIndex, baseWorkValue } from './systems/careers';
+export { stipendFor, canSponsor, patronCount, signedWithRival, atRisk } from './systems/patronage';
+export { synergy, themeTitle, fitsTheme, exhibitionCost, liveScore, type Synergy, type SynergyBonus } from './systems/exhibitions';

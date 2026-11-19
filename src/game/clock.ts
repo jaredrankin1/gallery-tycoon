@@ -1,6 +1,9 @@
 import { DIFFICULTY, GUESTS, RULES, TIME, VENUE } from './config';
 import type { Rng } from './rng';
 import { endOfDayArtists } from './systems/artists';
+import { endOfDayCareers } from './systems/careers';
+import { endOfDayExhibition } from './systems/exhibitions';
+import { endOfDayPatronage, weeklyPatronage } from './systems/patronage';
 import { resolveEvent } from './systems/events';
 import { notify } from './systems/feed';
 import { post } from './systems/ledger';
@@ -38,6 +41,7 @@ export function stepHour(state: GameState, rng: Rng): void {
   // close; how many come depends on the hour (see trafficShare).
   const arrivals = venue.hour(state, rng);
   state.today.visitors += arrivals;
+  if (state.exhibition) state.exhibition.visitors += arrivals;
   hourOfGuests(state, rng, arrivals);
 
   if (state.tick === TIME.eventTick) {
@@ -64,9 +68,13 @@ function endOfDay(state: GameState, rng: Rng): void {
     if (upkeep > 0) post(state, 'staff', -upkeep, 'Guards & climate control');
     const total = diff.weeklyRent + diff.weeklyStaff + upkeep;
     notify(state, { kind: 'bills', text: `Weekly bills paid: $${total.toLocaleString('en-US')}`, amount: -total });
+    weeklyPatronage(state, rng);
   }
 
   endOfDayArtists(state);
+  endOfDayPatronage(state, rng);
+  endOfDayCareers(state, rng);
+  endOfDayExhibition(state);
   state.buzz *= GUESTS.buzzDecay;
 
   state.history.push(state.today);

@@ -2,11 +2,13 @@ import { EVENT_KIND, FIXTURE, RULES } from './config';
 import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
+import { closeExhibition, mountExhibition } from './systems/exhibitions';
+import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/patronage';
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, freeDisplayFixture, unhang } from './systems/floor';
 import { post } from './systems/ledger';
 import { stepHour } from './clock';
-import type { BudgetPlan, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from './types';
+import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, StipendTier } from './types';
 import { getVenueModel } from './venues';
 
 /** Every player decision is one of these. The UI never mutates state directly. */
@@ -22,6 +24,13 @@ export type Action =
   | { type: 'scheduleEvent'; kind: EventKind; day: number; featuredArtistIds: Id[]; hospitality: HospitalityPlan }
   | { type: 'cancelEvent'; eventId: Id }
   | { type: 'setBudget'; budget: BudgetPlan }
+  /** Patronage: put an artist on a weekly stipend, change it, or end it. */
+  | { type: 'signPatron'; artistId: Id; tier: StipendTier }
+  | { type: 'setStipend'; artistId: Id; tier: StipendTier }
+  | { type: 'endPatronage'; artistId: Id }
+  /** Open a themed show built from what's on the walls, or close it early. */
+  | { type: 'mountExhibition'; theme: ExhibitionTheme }
+  | { type: 'closeExhibition' }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -109,6 +118,8 @@ function apply(state: GameState, action: Action): string | void {
       post(state, 'artist-care', -RULES.studioVisitCost, `Studio visit: ${artist.name}`);
       adjustRelationship(state, artist.id, RULES.studioVisitGain);
       artist.lastVisitDay = state.day;
+      artist.studioVisits += 1;
+      wardOffRival(state, artist);
       return;
     }
     case 'scheduleEvent': {
@@ -154,6 +165,20 @@ function apply(state: GameState, action: Action): string | void {
       state.budget = { art: Math.max(0, action.budget.art), hospitality: Math.max(0, action.budget.hospitality) };
       return;
     }
+    case 'signPatron':
+      return signPatron(state, action.artistId, action.tier);
+    case 'setStipend':
+      return setStipend(state, action.artistId, action.tier);
+    case 'endPatronage':
+      return endPatronage(state, action.artistId);
+    case 'mountExhibition': {
+      const rng = new Rng(state.rng);
+      const err = mountExhibition(state, action.theme, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'closeExhibition':
+      return closeExhibition(state, true);
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) stepHour(state, rng);

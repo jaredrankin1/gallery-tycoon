@@ -209,3 +209,117 @@ export const GUESTS = {
   reviewWeight: 1.4,
   harshReviewWeight: 2.2,
 };
+
+// ---- Artist careers ------------------------------------------------------------
+
+/** Career stages by fame. A step up revalues every work of theirs you own. */
+export const CAREER_STAGES = [
+  { min: 0, label: 'Unknown' },
+  { min: 20, label: 'Emerging' },
+  { min: 40, label: 'Established' },
+  { min: 60, label: 'Acclaimed' },
+  { min: 80, label: 'Blue-chip' },
+] as const;
+
+export const CAREER = {
+  /** Potential is fame at the start plus a roll in this range (hidden until scouted). */
+  potentialRoll: [-20, 45] as [number, number],
+  /** Studio visits it takes to read an artist's potential. */
+  visitsToScout: 2,
+  /** Share of the gap to potential closed each day. Patronage doubles it. */
+  driftToPotential: 0.005,
+  /** Daily chance of a breakout for an artist well below their potential. */
+  breakoutChance: 0.004,
+  breakoutGap: 25,
+  breakoutFame: 12,
+  /** Daily chance a hyped artist (fame well above potential) puts out a flop. */
+  flopChance: 0.004,
+  flopFame: 8,
+  /** Fame from being featured at an event, times the event's prestige and how well it went. */
+  eventFame: 0.6,
+  /** Fame from a sale, and extra when it sold at or above value. */
+  saleFame: 0.4,
+  premiumSaleFame: 0.4,
+  /** Fame per critic review star away from three, for each artist they looked at. */
+  pressFame: 0.6,
+};
+
+// ---- Patronage -----------------------------------------------------------------
+
+export const PATRONAGE = {
+  /** Most artists you can sponsor at once. */
+  slots: 3,
+  /** Fair weekly stipend as a share of what one of their works is worth. */
+  stipendShare: 0.35,
+  tiers: {
+    modest: { label: 'Modest', mult: 0.7, speed: 0.75, formTarget: -15, weeklyRelationship: -2 },
+    fair: { label: 'Fair', mult: 1, speed: 1, formTarget: 0, weeklyRelationship: 1 },
+    generous: { label: 'Generous', mult: 1.4, speed: 1.3, formTarget: 12, weeklyRelationship: 3 },
+  },
+  /** Relationship needed before they'll take your money. */
+  minRelationship: 10,
+  /** Daily chance of a delivery at a fair stipend and average form. */
+  deliveryChance: 1 / 8,
+  /** Fewest days between two deliveries. */
+  minDaysBetween: 2,
+  /** Relationship lost when you cut their stipend or drop them. */
+  cutPenalty: 6,
+  dropPenalty: 10,
+  /** Rivals only bother with artists at least this famous. */
+  rivalMinFame: 18,
+  /** Weekly chance a rival starts courting an underpaid or unhappy artist. */
+  courtChanceModest: 0.45,
+  courtChanceUnhappy: 0.25,
+  /** Below this relationship they listen to rivals. */
+  loyalAt: 25,
+  /** Days a poached artist stays with the rival. */
+  rivalLockDays: 28,
+  /** Daily chance an artist moves into a new creative phase. */
+  phaseChance: 1 / 30,
+};
+
+export const RIVAL_GALLERIES = ['Halvorsen & Pike', 'The Glasshouse', 'Okonkwo Fine Art', 'Studio Meridian', 'Vane Contemporary'];
+
+/** Tags an artist can drift into. Each one is also an exhibition theme. */
+export const PHASE_TAGS = ['moody', 'colorful', 'experimental', 'quiet', 'weird', 'minimal', 'retro', 'fantasy', 'portrait', 'landscape'];
+
+// ---- Exhibitions ---------------------------------------------------------------
+
+/** Themes you can hang a show around, keyed by tag. */
+export const EXHIBITION_THEMES: { tag: string; title: string }[] = [
+  { tag: 'portrait', title: 'Faces in the Crowd' },
+  { tag: 'landscape', title: 'Elsewhere' },
+  { tag: 'moody', title: 'After Dark' },
+  { tag: 'colorful', title: 'Full Spectrum' },
+  { tag: 'quiet', title: 'Stillness' },
+  { tag: 'experimental', title: 'New Directions' },
+  { tag: 'weird', title: 'Strange Days' },
+  { tag: 'fantasy', title: 'Otherworlds' },
+  { tag: 'pop', title: 'Pop Life' },
+  { tag: 'retro', title: 'Tomorrow, Yesterday' },
+  { tag: 'figurative', title: 'The Human Figure' },
+  { tag: 'classic', title: 'Old Hands' },
+  { tag: 'minimal', title: 'Less' },
+];
+
+export const EXHIBITION = {
+  /** Days a show runs. */
+  days: 7,
+  /** On-theme works on the walls needed to open. */
+  minWorks: 3,
+  baseCost: 1_500,
+  perWorkCost: 150,
+  /** Crowd multiplier at a perfect score is 1 + this. */
+  crowdBoost: 0.5,
+  /** Sale chance multiplier for on-theme works at a perfect score is 1 + this. */
+  saleBoost: 1,
+  /** Event turnout bonus when a featured artist is in the show. */
+  eventBoost: 0.4,
+  /** Reputation per opening-review star away from three. */
+  reviewWeight: 1.5,
+  /** Fame per star for artists in the show (doubled for unknowns). */
+  famePerStar: 0.6,
+  historySize: 10,
+  /** Penalty for repeating a theme from one of your last two shows. */
+  repeatPenalty: 0.15,
+};

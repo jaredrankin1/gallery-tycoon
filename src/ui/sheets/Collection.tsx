@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { getVenueModel, RULES } from '../../game';
-import { ArtThumb, Avatar, money, Seg, Sheet } from '../bits';
+import { ArtThumb, Avatar, money, Seg, Sheet, shortMoney } from '../bits';
 import { useGame } from '../context';
 
 export function CollectionSheet() {
@@ -72,7 +72,19 @@ export function CollectionSheet() {
                   <div class="grow">
                     <b>“{w.title}”</b>
                     <small class="muted">
-                      {a.name} · {canSell ? `asking ${money(w.price)}` : `worth ${money(w.value)}`}
+                      {a.name}
+                      {w.commissioned && <span class="gold"> · commissioned</span>}
+                    </small>
+                    <small class="muted">
+                      Worth {shortMoney(w.value)}
+                      {w.acquiredFor > 0 && w.value !== w.acquiredFor && (
+                        <span class={w.value > w.acquiredFor ? 'up' : 'down'}>
+                          {' '}
+                          {w.value > w.acquiredFor ? '▲' : '▼'}
+                          {Math.abs(Math.round(((w.value - w.acquiredFor) / w.acquiredFor) * 100))}%
+                        </span>
+                      )}
+                      {canSell && ` · asking ${shortMoney(w.price)}`}
                     </small>
                   </div>
                   {hanging ? (
