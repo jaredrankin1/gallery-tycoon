@@ -31,8 +31,8 @@ export interface Theme {
 }
 
 export const THEMES: Record<GameState['venue'], Theme> = {
-  gallery: { floorA: '#d9c3a0', floorB: '#cfb790', wallLeft: '#f3efe8', wallRight: '#e4ded4', wallTop: '#bdb5a8', bg: '#1d1a17' },
-  museum: { floorA: '#d7d7d2', floorB: '#c9c9c3', wallLeft: '#ece6da', wallRight: '#dcd4c6', wallTop: '#a89f90', bg: '#17191c' },
+  gallery: { floorA: '#d9c3a0', floorB: '#cfb790', wallLeft: '#f3efe8', wallRight: '#e4ded4', wallTop: '#bdb5a8', bg: '#1f4e9e' },
+  museum: { floorA: '#d7d7d2', floorB: '#c9c9c3', wallLeft: '#ece6da', wallRight: '#dcd4c6', wallTop: '#a89f90', bg: '#1c1c1c' },
 };
 
 interface Floater {
@@ -169,13 +169,52 @@ export class IsoRenderer {
     this.highlight = h;
   }
 
+  /**
+   * Bauhaus poster behind the room: a flat colour field with a few big primary shapes.
+   * Fixed to the screen (it doesn't pan), so the room reads as an object on a poster.
+   */
+  private drawBackdrop(theme: Theme, cw: number, ch: number) {
+    const ctx = this.ctx;
+    const u = cw / 100;
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    // big red disc, upper right
+    ctx.fillStyle = '#d7301f';
+    ctx.beginPath();
+    ctx.arc(cw - 8 * u, ch * 0.3, 34 * u, 0, Math.PI * 2);
+    ctx.fill();
+    // yellow quarter disc, lower left
+    ctx.fillStyle = '#f4b400';
+    ctx.beginPath();
+    ctx.moveTo(0, ch * 0.86);
+    ctx.arc(0, ch * 0.86, 44 * u, -Math.PI / 2, 0);
+    ctx.closePath();
+    ctx.fill();
+    // black bars and a thin rule, like a type block on a poster
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(6 * u, ch * 0.22, 3.2 * u, ch * 0.5);
+    ctx.fillRect(6 * u, ch * 0.72, 38 * u, 3.2 * u);
+    ctx.fillRect(62 * u, ch * 0.7, 32 * u, 0.9 * u);
+    // off-white triangle, far right
+    ctx.fillStyle = '#f2ede2';
+    ctx.beginPath();
+    ctx.moveTo(cw, ch * 0.62);
+    ctx.lineTo(cw, ch * 0.84);
+    ctx.lineTo(cw - 20 * u, ch * 0.84);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   /** In build mode, legal tiles are tinted and a ghost follows the pointer. */
   setBuildKind(kind: FixtureKind | null) {
     this.buildKind = kind;
   }
 
   /** Floating "+$12,400" style label rising from a tile. */
-  pop(x: number, y: number, text: string, color = '#f2c14e') {
+  pop(x: number, y: number, text: string, color = '#f4b400') {
     this.floaters.push({ x: x + 0.5, y: y + 0.5, text, color, age: 0 });
     // Marisol celebrates every sale.
     this.cheerUntil = performance.now() + 1800;
@@ -299,8 +338,7 @@ export class IsoRenderer {
     const cw = this.canvas.clientWidth;
     const ch = this.canvas.clientHeight;
     ctx.save();
-    ctx.fillStyle = theme.bg;
-    ctx.fillRect(0, 0, cw, ch);
+    this.drawBackdrop(theme, cw, ch);
     ctx.translate(this.origin.x + this.pan.x, this.origin.y + this.pan.y);
     ctx.scale(this.scale, this.scale);
 
@@ -363,7 +401,7 @@ export class IsoRenderer {
     for (const f of this.floaters) {
       const p = toScreen(f.x, f.y, 50 + f.age * 40);
       ctx.globalAlpha = Math.max(0, 1 - f.age / 1.8);
-      ctx.font = '700 15px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = '700 15px Jost, Futura, "Century Gothic", ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.lineWidth = 4;
       ctx.strokeStyle = 'rgba(20,16,12,0.85)';
@@ -781,7 +819,7 @@ export class IsoRenderer {
       ctx.arc(p.x + 10, top - 4 + bob, 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = bubble.color;
-      ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = '700 11px Jost, Futura, "Century Gothic", ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(bubble.text, p.x + 10, top - 3.5 + bob);
@@ -796,7 +834,7 @@ export class IsoRenderer {
     }
     if (this.selectedGuest === v.guestId) {
       const label = g ? shortName(g) : (v.name?.split(' ')[0] ?? 'Visitor');
-      ctx.font = '700 10px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = '700 10px Jost, Futura, "Century Gothic", ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       const w = ctx.measureText(label).width + 10;
       ctx.fillStyle = 'rgba(224,170,69,0.95)';
