@@ -1,26 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { babble } from '../src/audio/babble';
+import { whisper } from '../src/audio/whisper';
 
-describe('crowd chatter', () => {
-  it('makes a clean, loopable stereo murmur', () => {
-    const sr = 8000;
-    const [l, r] = babble(sr, 4, 5, 3);
-    expect(l.length).toBe(sr * 4);
-    expect(r.length).toBe(l.length);
-    let peak = 0;
-    let energy = 0;
-    for (let i = 0; i < l.length; i++) {
-      expect(Number.isFinite(l[i]) && Number.isFinite(r[i])).toBe(true);
-      peak = Math.max(peak, Math.abs(l[i]), Math.abs(r[i]));
-      energy += l[i] * l[i];
+describe('gallery whispers', () => {
+  it('makes a clean, quiet-edged snippet', () => {
+    const sr = 16000;
+    for (let seed = 1; seed <= 20; seed++) {
+      const w = whisper(sr, seed);
+      let peak = 0;
+      let energy = 0;
+      let finite = true;
+      for (const x of w) {
+        finite &&= Number.isFinite(x);
+        peak = Math.max(peak, Math.abs(x));
+        energy += x * x;
+      }
+      expect(finite).toBe(true);
+      expect(peak).toBeLessThanOrEqual(0.91);
+      expect(energy / w.length).toBeGreaterThan(0.001);
+      // Starts and ends in silence, so it never clicks.
+      expect(Math.abs(w[0])).toBeLessThan(0.01);
+      expect(Math.abs(w[w.length - 1])).toBeLessThan(0.01);
+      // A breath, not a speech: a few seconds at most.
+      expect(w.length / sr).toBeLessThan(5);
     }
-    expect(peak).toBeLessThanOrEqual(0.91);
-    expect(energy / l.length).toBeGreaterThan(0.002);
-    // The loop point doesn't click: end and start are close.
-    expect(Math.abs(l[l.length - 1] - l[0])).toBeLessThan(0.2);
+  });
+
+  it('varies a lot from snippet to snippet', () => {
+    const lengths = new Set<number>();
+    for (let seed = 1; seed <= 30; seed++) lengths.add(Math.round((whisper(16000, seed).length / 16000) * 10));
+    // Lengths spread across many tenths of a second, from "hm" to a sentence.
+    expect(lengths.size).toBeGreaterThan(8);
+  });
+
+  it('has no voice pitch (no groaning buzz)', () => {
+    // A voiced murmur repeats every pitch period (5 to 12 ms); breath doesn't.
+    const sr = 16000;
+    const w = whisper(sr, 5);
+    let zero = 0;
+    for (const x of w) zero += x * x;
+    let best = 0;
+    for (let lag = Math.floor(sr / 250); lag <= Math.floor(sr / 80); lag++) {
+      let c = 0;
+      for (let i = 0; i + lag < w.length; i++) c += w[i] * w[i + lag];
+      best = Math.max(best, c / zero);
+    }
+    expect(best).toBeLessThan(0.3);
   });
 
   it('is the same every time for a seed', () => {
-    expect(babble(8000, 1, 2, 9)[0]).toEqual(babble(8000, 1, 2, 9)[0]);
+    expect(whisper(8000, 9)).toEqual(whisper(8000, 9));
   });
 });

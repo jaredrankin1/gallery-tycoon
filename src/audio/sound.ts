@@ -1,7 +1,7 @@
-import { babble } from './babble';
+import { whisper } from './whisper';
 
 /**
- * The gallery's sound: crowd chatter that follows how many people are on the
+ * The gallery's sound: hushed whispers that follow how many people are on the
  * floor, a quiet room tone, and short synthesized effects (door chime, sales,
  * camera clicks, glasses at parties, button taps). Everything is generated in
  * the browser, so nothing has to load.
@@ -28,8 +28,11 @@ class Sound {
   private master: GainNode | null = null;
   private fx: GainNode | null = null;
   private room: ConvolverNode | null = null;
-  private few: GainNode | null = null;
-  private crowd: GainNode | null = null;
+  private whispers: GainNode | null = null;
+  /** Whispered snippets, a different speaker each; a few are swapped for new ones as the game runs. */
+  private bank: AudioBuffer[] = [];
+  private live = 0;
+  private nextSwap = 0;
   private hum: GainNode | null = null;
   private listeners = new Set<() => void>();
   private last: Partial<Record<Sfx, number>> = {};
@@ -120,37 +123,30 @@ class Sound {
     hum.connect(hl).connect(this.hum).connect(this.master);
     hum.start();
 
-    // Chatter loops are synthesized a moment later so the first tap stays snappy.
-    setTimeout(() => this.buildChatter(), 30);
+    // Whispers all share one gain, so pausing or muting hushes them together.
+    this.whispers = ctx.createGain();
+    this.whispers.gain.value = 1;
+    this.whispers.connect(this.master);
+    this.whispers.connect(this.room);
+    // Snippets are synthesized a few at a time so the first tap stays snappy.
+    this.fillBank(0);
   }
 
-  private buildChatter() {
-    const ctx = this.ctx;
-    if (!ctx || !this.master || !this.room) return;
-    // Chatter is muffled anyway, so a low sample rate is plenty and synthesizes fast.
-    const sr = 16000;
-    const loop = (seconds: number, voices: number, seed: number) => {
-      const [l, r] = babble(sr, seconds, voices, seed);
-      const buf = ctx.createBuffer(2, l.length, sr);
-      buf.getChannelData(0).set(l);
-      buf.getChannelData(1).set(r);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.loop = true;
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      src.connect(g);
-      g.connect(this.master!);
-      g.connect(this.room!);
-      src.start(0, Math.random() * seconds);
-      return g;
-    };
-    // Two loops, built a frame apart so neither holds up the page for long.
-    this.few = loop(11, 3, 7);
-    setTimeout(() => {
-      this.crowd = loop(15, 11, 23);
-      this.applyAmbience();
-    }, 50);
+  private static BANK = 36;
+  private static SR = 22050;
+
+  private makeWhisper(seed: number) {
+    const ctx = this.ctx!;
+    const d = whisper(Sound.SR, seed);
+    const buf = ctx.createBuffer(1, d.length, Sound.SR);
+    buf.getChannelData(0).set(d);
+    return buf;
+  }
+
+  private fillBank(from: number) {
+    if (!this.ctx) return;
+    for (let i = from; i < Math.min(Sound.BANK, from + 6); i++) this.bank.push(this.makeWhisper((Math.random() * 2 ** 31) | 0));
+    if (this.bank.length < Sound.BANK) setTimeout(() => this.fillBank(this.bank.length), 40);
   }
 
   /** How busy the room is right now. Called a few times a second. */
@@ -159,6 +155,7 @@ class Sound {
     const changed = a.count !== count || a.party !== party || a.paused !== paused;
     this.ambience = { count, party, paused };
     if (changed) this.applyAmbience();
+    this.murmur(0.25);
     // Glasses at a party, more often the fuller it gets.
     if (party && !paused && count > 0 && this.ctx) {
       const now = this.ctx.currentTime;
@@ -171,16 +168,72 @@ class Sound {
 
   private applyAmbience() {
     const ctx = this.ctx;
-    if (!ctx || !this.few) return;
+    if (!ctx || !this.whispers) return;
+    // Frozen in time: the room goes almost silent.
+    const { paused } = this.ambience;
+    this.whispers.gain.setTargetAtTime(paused ? 0.35 : 1, ctx.currentTime, 0.6);
+  }
+
+  /**
+   * Scatter whispers around the room for the next `span` seconds. Each person
+   * leans in to say something every ten seconds or so, so more people means
+   * more whispers overlapping, but each one stays quiet.
+   */
+  private murmur(span: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.whispers || !this.enabled || ctx.state !== 'running' || this.bank.length < 4) return;
     const { count, party, paused } = this.ambience;
-    // Frozen in time: the murmur drops right down.
-    const hush = paused ? 0.25 : 1;
-    const lift = party ? 1.35 : 1;
-    const few = count <= 0 ? 0 : Math.min(1, 0.3 + count * 0.18) * (count > 12 ? 0.6 : 1);
-    const crowd = Math.max(0, Math.min(1, (count - 3) / 20));
-    const t = ctx.currentTime;
-    this.few.gain.setTargetAtTime(few * 0.3 * hush * lift, t, 0.9);
-    this.crowd?.gain.setTargetAtTime(crowd * 0.42 * hush * lift, t, 0.9);
+    if (count <= 0) return;
+    const now = ctx.currentTime;
+    // Keep the bank fresh so the room never settles into a pattern.
+    if (now >= this.nextSwap) {
+      if (this.nextSwap && this.bank.length >= Sound.BANK) this.bank[Math.floor(Math.random() * this.bank.length)] = this.makeWhisper((Math.random() * 2 ** 31) | 0);
+      this.nextSwap = now + 4 + Math.random() * 6;
+    }
+    const perPerson = party ? 1 / 7 : 1 / 11;
+    const rate = Math.min(party ? 2.6 : 1.8, count * perPerson) * (paused ? 0.25 : 1);
+    const cap = Math.min(party ? 7 : 5, 1 + Math.ceil(count / 3));
+    // Poisson arrivals: a random number of whispers, at random moments.
+    let n = 0;
+    const expect = rate * span;
+    let p = Math.exp(-expect);
+    let acc = p;
+    const u = Math.random();
+    while (u > acc && n < 6) {
+      n++;
+      p *= expect / n;
+      acc += p;
+    }
+    // Busier rooms: each whisper a touch quieter, so the total stays hushed.
+    const crowdTrim = 1 / Math.sqrt(1 + count / 12);
+    for (let i = 0; i < n && this.live < cap; i++) {
+      this.speak(now + 0.02 + Math.random() * span, crowdTrim * (party ? 1.15 : 1));
+    }
+  }
+
+  private speak(t: number, level: number) {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.bank[Math.floor(Math.random() * this.bank.length)];
+    // Different voices: playback speed shifts mouth size and pace together.
+    src.playbackRate.value = 0.84 + Math.random() * 0.34;
+    // Distance: far whispers are quieter and duller.
+    const near = Math.random();
+    const tone = ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 2200 + near * 4200;
+    tone.Q.value = 0.5;
+    const g = ctx.createGain();
+    g.gain.value = (0.035 + near * near * 0.075) * level;
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = Math.random() * 1.7 - 0.85;
+    src.connect(tone).connect(g).connect(pan).connect(this.whispers!);
+    this.live++;
+    src.onended = () => {
+      this.live--;
+      pan.disconnect();
+    };
+    src.start(t);
   }
 
   play(kind: Sfx) {
