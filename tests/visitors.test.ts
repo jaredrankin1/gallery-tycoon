@@ -11,6 +11,12 @@ const run = (s: GameState, a: Action) => {
 const offers = (s: GameState) => Object.values(s.artworks).filter((w) => w.status === 'offered');
 const hung = (venue: 'gallery' | 'museum', seed: number) => {
   let s = createNewGame({ name: 'x', difficulty: 'easy', venue, seed });
+  // A couple of pedestals, so sculpture has somewhere to go too.
+  let placed = 0;
+  for (let y = 2; y < s.floor.height - 1 && placed < 2; y++) {
+    const r = dispatch(s, { type: 'placeFixture', kind: 'pedestal', x: 3 + placed * 2, y });
+    if (r.ok) [s, placed] = [r.state, placed + 1];
+  }
   for (const w of offers(s).slice(0, 4)) {
     s = run(s, { type: 'buyArtwork', artworkId: w.id });
     // Anything that won't go up where there's room (a sculpture with no free pedestal) stays in storage.
