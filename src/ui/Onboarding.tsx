@@ -40,7 +40,7 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
 
   const open = () => {
     clearSave();
-    const game = createNewGame({ name, difficulty, venue });
+    const game = createNewGame({ name, difficulty, venue, autoHang: true });
     store.autosave = true;
     store.load(game, 1);
     saveGame(game);

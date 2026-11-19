@@ -126,7 +126,7 @@ export interface DayReport {
   sales: number;
 }
 
-export type FeedKind = 'sale' | 'tickets' | 'event' | 'artist' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
+export type FeedKind = 'staff' | 'sale' | 'tickets' | 'event' | 'artist' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
 
 /** Something worth telling the player about, as it happens. The UI shows new ones as toasts. */
 export interface FeedItem {
@@ -249,6 +249,47 @@ export interface GuestVisit {
   look?: { sprite: string; variant: number };
 }
 
+// ---- Staff: Marisol hangs new arrivals when auto-hang is on ----------------
+
+/**
+ * One piece Marisol is putting out. The placement is already made in the
+ * floor plan when the job is created; these times only say when the renderer
+ * shows her fetch it from the door, carry it over and hang it.
+ */
+export interface HangJob {
+  artworkId: Id;
+  fixtureId: Id;
+  /** Piece she took down to make room. Shown on the fixture until the swap. */
+  evictedId?: Id;
+  /** She had the fixture built for this piece. Hidden until she gets there. */
+  built?: boolean;
+  /** Absolute hours (see absHour). */
+  start: number;
+  /** Reaches the door to collect it. */
+  pickupAt: number;
+  /** Leaves the door carrying it. */
+  carryAt: number;
+  /** Reaches the spot. */
+  arriveAt: number;
+  /** The piece goes up. */
+  hangAt: number;
+  end: number;
+  /** Where she was when the job started. */
+  from: { x: number; y: number };
+  door: { x: number; y: number };
+  /** Where she stands to hang it, and which way she faces. */
+  at: { x: number; y: number };
+  faceLeft: boolean;
+}
+
+export interface StaffState {
+  /** Marisol places new art herself: makes room, builds a spot if she can, hangs it. */
+  autoHang: boolean;
+  /** Works she has already dealt with (or that were already here when auto-hang came on). */
+  seen: Id[];
+  jobs: HangJob[];
+}
+
 export interface GameState {
   version: 4;
   name: string;
@@ -281,5 +322,7 @@ export interface GameState {
   /** Seeded RNG state so a run is reproducible. */
   rng: number;
   nextId: number;
+  /** Missing on older saves; see ensureStaff(). */
+  staff?: StaffState;
   status: 'playing' | 'bankrupt';
 }

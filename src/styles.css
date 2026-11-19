@@ -355,3 +355,12 @@ q.said::after { content: '”'; }
 .art-card .thumb.lg.img { aspect-ratio: 1 / 1; }
 .art-card .thumb.img img { object-position: 50% 30%; }
 .insp-art .thumb.lg.img { width: 24cqw; }
+
+/* Auto-hang switch in the Art sheet */
+.autohang { display: flex; align-items: center; gap: 3cqw; width: 100%; text-align: left; margin: 3cqw 0 1cqw; padding: 2.6cqw 3.4cqw; background: #2f2924; border: 1px solid var(--line); border-radius: var(--r); }
+.autohang .grow { display: flex; flex-direction: column; gap: 0.6cqw; }
+.autohang small { font-size: 0.78em; line-height: 1.3; }
+.autohang .knob { flex: none; position: relative; width: 11cqw; height: 6.4cqw; border-radius: 99px; background: #4a423a; transition: background 0.15s; }
+.autohang .knob::after { content: ''; position: absolute; top: 0.8cqw; left: 0.8cqw; width: 4.8cqw; height: 4.8cqw; border-radius: 50%; background: #e9e1d4; transition: transform 0.15s; }
+.autohang.on .knob { background: var(--accent); }
+.autohang.on .knob::after { transform: translateX(4.6cqw); }

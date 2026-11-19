@@ -13,4 +13,5 @@ export { getVenueModel } from './venues';
 export { canPlace, fixtureAt, displayFixtures, fitsOn } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
+export { planPlacement, shownOnFixture } from './systems/autohang';
 export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';

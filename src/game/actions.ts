@@ -2,12 +2,14 @@ import { EVENT_KIND, FIXTURE, RULES } from './config';
 import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
+import { ensureStaff, staffUpdate } from './systems/autohang';
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
 import { stepHour } from './clock';
 import type { BudgetPlan, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from './types';
 import { getVenueModel } from './venues';
+import { absHour } from './systems/visits';
 
 /** Every player decision is one of these. The UI never mutates state directly. */
 export type Action =
@@ -22,6 +24,8 @@ export type Action =
   | { type: 'scheduleEvent'; kind: EventKind; day: number; featuredArtistIds: Id[]; hospitality: HospitalityPlan }
   | { type: 'cancelEvent'; eventId: Id }
   | { type: 'setBudget'; budget: BudgetPlan }
+  /** Marisol places new art herself (makes room, builds a spot if affordable, hangs it). */
+  | { type: 'setAutoHang'; on: boolean }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -35,7 +39,11 @@ export function dispatch(prev: GameState, action: Action): ActionResult {
   if (prev.status !== 'playing') return { ok: false, state: prev, error: 'The game is over.' };
   const state = structuredClone(prev);
   const error = apply(state, action);
-  return error ? { ok: false, state: prev, error } : { ok: true, state };
+  if (error) return { ok: false, state: prev, error };
+  // New arrivals: Marisol picks them up. After a tick the screen is at the new hour;
+  // otherwise it's partway through the current one, so she starts at the next.
+  staffUpdate(state, absHour(state) + (action.type === 'tick' ? 0 : 1));
+  return { ok: true, state };
 }
 
 function apply(state: GameState, action: Action): string | void {
@@ -153,6 +161,10 @@ function apply(state: GameState, action: Action): string | void {
     }
     case 'setBudget': {
       state.budget = { art: Math.max(0, action.budget.art), hospitality: Math.max(0, action.budget.hospitality) };
+      return;
+    }
+    case 'setAutoHang': {
+      ensureStaff(state).autoHang = action.on;
       return;
     }
     case 'tick': {

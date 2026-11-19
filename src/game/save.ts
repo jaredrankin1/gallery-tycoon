@@ -21,6 +21,14 @@ export function loadGame(): GameState | null {
     for (const seed of ARTIST_SEEDS) {
       parsed.artists[seed.id] ??= { ...seed, relationship: seed.relationship ?? 0, lastContactDay: parsed.day };
     }
+    // Saves from before auto-hang: Marisol takes it on, leaving what's already there alone.
+    if (!parsed.staff) {
+      parsed.staff = {
+        autoHang: true,
+        seen: Object.values(parsed.artworks).filter((w) => w.status === 'storage' || w.status === 'display').map((w) => w.id),
+        jobs: [],
+      };
+    }
     return parsed;
   } catch {
     return null;

@@ -1,5 +1,5 @@
-import { GUESTS, isNight, TIME } from '../config';
-import type { FloorPlan, GameState } from '../types';
+import { AUTO_HANG, GUESTS, isNight, TIME } from '../config';
+import type { FloorPlan, GameState, HangJob, Id } from '../types';
 import { hash01 } from './taste';
 import { standSpot } from './visits';
 
@@ -21,6 +21,8 @@ export interface AssistantPose {
   local: number;
   /** How long the current action lasts, in hours, when it has a set end (one-shot animations play across it). */
   span?: number;
+  /** The artwork she's carrying over to hang. */
+  carrying?: Id;
 }
 
 /** Each job takes this long, walking there included. */
@@ -31,7 +33,7 @@ type Job = { at: { x: number; y: number }; anim: AssistantAnim; faceLeft: boolea
 const door = (floor: FloorPlan) => ({ x: floor.entrance.x + 0.5, y: floor.entrance.y + 0.5 });
 
 /** By the door, facing in, ready to say hello or goodbye. */
-function doorPost(floor: FloorPlan): Job['at'] {
+export function doorPost(floor: FloorPlan): Job['at'] {
   const d = door(floor);
   return { x: Math.max(0.6, d.x - 0.9), y: Math.max(0.6, d.y - 0.9) };
 }
@@ -52,8 +54,47 @@ function jobFor(state: GameState, n: number): Job {
   return { at, faceLeft: hash01(`marisol-l${n}`) < 0.5, anim: roll < 0.85 ? 'clipboard' : roll < 0.93 ? 'radio' : 'crossed' };
 }
 
+const walkHours = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(b.x - a.x, b.y - a.y) / GUESTS.walkTilesPerHour;
+
+function walking(from: { x: number; y: number }, to: { x: number; y: number }, k: number, local: number): AssistantPose {
+  return {
+    x: from.x + (to.x - from.x) * k,
+    y: from.y + (to.y - from.y) * k,
+    anim: 'walk',
+    faceLeft: to.x - from.x - (to.y - from.y) < 0,
+    local,
+  };
+}
+
 /** Where Marisol is and what she's doing at absolute game time `now` (see absHour). */
 export function assistantPose(state: GameState, now: number): AssistantPose {
+  const jobs = state.staff?.jobs ?? [];
+  // The latest hang job that has started: she's on it, or heading back from it.
+  let job: HangJob | undefined;
+  for (const j of jobs) if (j.start <= now && (!job || j.start >= job.start)) job = j;
+  if (job) {
+    const p = hangJobPose(job, now);
+    if (p) return p;
+    // Done: walk back into her routine, unless the next piece is already waiting.
+    const back = routinePose(state, now);
+    const dur = Math.max(0.2, Math.min(AUTO_HANG.returnHours * 3, walkHours(job.at, back)));
+    if (now < job.end + dur) return walking(job.at, back, (now - job.end) / dur, now - job.end);
+  }
+  return routinePose(state, now);
+}
+
+/** Her pose during a hang job, or null once it's over. */
+function hangJobPose(j: HangJob, now: number): AssistantPose | null {
+  if (now < j.pickupAt) return walking(j.from, j.door, (now - j.start) / Math.max(1e-6, j.pickupAt - j.start), now - j.start);
+  if (now < j.carryAt) return { ...j.door, anim: 'clipboard', faceLeft: false, local: now - j.pickupAt };
+  if (now < j.arriveAt) return { ...walking(j.door, j.at, (now - j.carryAt) / Math.max(1e-6, j.arriveAt - j.carryAt), now - j.carryAt), carrying: j.artworkId };
+  if (now < j.hangAt) return { ...j.at, anim: 'point', faceLeft: j.faceLeft, local: now - j.arriveAt };
+  if (now < j.end) return { ...j.at, anim: 'cheer', faceLeft: j.faceLeft, local: now - j.hangAt };
+  return null;
+}
+
+/** Her everyday routine: dusting, greeting, clipboard rounds, and the night watch. */
+export function routinePose(state: GameState, now: number): AssistantPose {
   const floor = state.floor;
   const hourOfDay = now - Math.floor(now / TIME.ticksPerDay) * TIME.ticksPerDay;
   // Night shift: she keeps watch by the door, checking in on the radio now and then.

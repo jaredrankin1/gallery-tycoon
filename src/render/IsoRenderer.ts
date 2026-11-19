@@ -1,5 +1,6 @@
 import {
   assistantPose,
+  shownOnFixture,
   canPlace,
   poseAt,
   shortName,
@@ -302,16 +303,24 @@ export class IsoRenderer {
     this.drawWalls(theme);
     this.drawFloor(theme);
 
+    const now = this.clock();
+    // While Marisol is on her way with a new piece, its spot still shows what was there.
+    const shown: Fixture[] = [];
+    for (const f of s.floor.fixtures) {
+      const art = shownOnFixture(s, f, now);
+      if (art === 'hidden') continue;
+      shown.push(art === (f.artworkId ?? null) ? f : art ? { ...f, artworkId: art } : { id: f.id, kind: f.kind, x: f.x, y: f.y });
+    }
+
     // Wall art sits on the wall plane, behind everything on the floor.
-    for (const f of s.floor.fixtures) if (f.kind === 'wallHang') this.drawWallHang(f);
+    for (const f of shown) if (f.kind === 'wallHang') this.drawWallHang(f);
 
     // Depth-sort floor objects and people by x + y.
     type Drawable = { depth: number; draw: () => void };
     const items: Drawable[] = [];
-    for (const f of s.floor.fixtures) {
+    for (const f of shown) {
       if (f.kind !== 'wallHang') items.push({ depth: f.x + f.y + 1, draw: () => this.drawFixture(f) });
     }
-    const now = this.clock();
     this.guestHits = [];
     this.guestCount = 0;
     for (const v of s.visits) {
@@ -629,7 +638,49 @@ export class IsoRenderer {
     ctx.translate(pt.x, pt.y + 2);
     if (p.faceLeft) ctx.scale(-1, 1);
     ctx.drawImage(img, frame * cw, row * ch, cw, ch, (-cw * scale) / 2, -ch * scale, cw * scale, ch * scale);
+    if (p.carrying) this.drawParcel(p.carrying, frame);
     ctx.restore();
+  }
+
+  /**
+   * What Marisol carries over to hang: a painting wrapped in brown paper and
+   * string, or a slatted crate for sculpture. Drawn in her mirrored space, held
+   * out in front of her, bobbing with her step.
+   */
+  private drawParcel(artworkId: string, frame: number) {
+    const ctx = this.ctx;
+    const bob = frame % 2;
+    const sculpture = this.state!.artworks[artworkId]?.form === 'sculpture';
+    if (sculpture) {
+      const x = 2;
+      const y = -30 + bob;
+      ctx.fillStyle = '#b98a52';
+      ctx.fillRect(x, y, 16, 15);
+      ctx.strokeStyle = '#7a5530';
+      ctx.lineWidth = 1;
+      for (const dy of [4, 9]) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + dy + 0.5);
+        ctx.lineTo(x + 16, y + dy + 0.5);
+        ctx.stroke();
+      }
+      ctx.strokeRect(x + 0.5, y + 0.5, 15, 14);
+      return;
+    }
+    const x = 3;
+    const y = -40 + bob;
+    ctx.fillStyle = '#c9a26b';
+    ctx.fillRect(x, y, 13, 19);
+    ctx.strokeStyle = '#8a6a3e';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, 12, 18);
+    ctx.strokeStyle = '#f1e6cf';
+    ctx.beginPath();
+    ctx.moveTo(x + 6.5, y);
+    ctx.lineTo(x + 6.5, y + 19);
+    ctx.moveTo(x, y + 9.5);
+    ctx.lineTo(x + 13, y + 9.5);
+    ctx.stroke();
   }
 
   /** One guest: sprite frame, shadow, mood bubble, and a name tag when selected. */

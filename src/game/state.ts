@@ -13,6 +13,8 @@ export interface NewGameOptions {
   difficulty: Difficulty;
   venue: VenueType;
   seed?: number;
+  /** Marisol hangs new art herself. Off unless asked for (the game's new-game screen turns it on). */
+  autoHang?: boolean;
 }
 
 export function createNewGame(opts: NewGameOptions): GameState {
@@ -49,6 +51,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     feedSeq: 0,
     rng: opts.seed ?? Math.floor(Math.random() * 2 ** 31),
     nextId: 1,
+    staff: { autoHang: !!opts.autoHang, seen: [], jobs: [] },
     status: 'playing',
   };
 

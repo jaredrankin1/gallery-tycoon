@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { getVenueModel, RULES } from '../../game';
+import { ASSISTANT, getVenueModel, RULES } from '../../game';
 import { ArtThumb, Avatar, money, Seg, Sheet } from '../bits';
 import { useGame } from '../context';
 
@@ -11,6 +11,7 @@ export function CollectionSheet() {
     .filter((w) => w.status === 'offered')
     .sort((a, b) => a.price - b.price);
   const canSell = getVenueModel(state.venue).canSell;
+  const autoHang = !!state.staff?.autoHang;
 
   return (
     <Sheet title="Art" onClose={() => setUi({ sheet: null })}>
@@ -22,6 +23,18 @@ export function CollectionSheet() {
         value={tab}
         onPick={setTab}
       />
+
+      <button class={`autohang ${autoHang ? 'on' : ''}`} role="switch" aria-checked={autoHang} onClick={() => act({ type: 'setAutoHang', on: !autoHang })}>
+        <span class="grow">
+          <b>{ASSISTANT.name} hangs new art</b>
+          <small class="muted">
+            {autoHang
+              ? 'She finds a spot, builds one if you can afford it, or swaps out a weaker piece.'
+              : 'Off: new pieces wait in storage for you to place.'}
+          </small>
+        </span>
+        <span class="knob" aria-hidden="true" />
+      </button>
 
       {tab === 'market' && (
         <>
@@ -46,7 +59,7 @@ export function CollectionSheet() {
                     class={`btn ${deal ? 'primary' : ''}`}
                     disabled={state.cash - w.price < RULES.overdraftLimit}
                     onClick={() => {
-                      if (act({ type: 'buyArtwork', artworkId: w.id })) toast(`Bought “${w.title}”. It’s in storage under Yours.`);
+                      if (act({ type: 'buyArtwork', artworkId: w.id }) && !autoHang) toast(`Bought “${w.title}”. It’s in storage under Yours.`);
                     }}
                   >
                     Buy {money(w.price)}

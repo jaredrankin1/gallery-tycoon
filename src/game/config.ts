@@ -174,6 +174,20 @@ export const FIXTURE: Record<FixtureKind, FixtureConfig> = {
   plant: { label: 'Plant', cost: 150, display: false, wallOnly: false },
 };
 
+/** Marisol's auto-hang. Durations in game hours. */
+export const AUTO_HANG = {
+  /** She won't spend below this on a new wall spot or pedestal. */
+  cashReserve: 2_000,
+  /** Signing for the piece at the door. */
+  pickupHours: 0.35,
+  /** Up on the wall (or onto the pedestal) after she arrives. */
+  hangHours: 0.45,
+  /** Stepping back to admire it. */
+  admireHours: 0.4,
+  /** Drifting back to her routine afterwards. */
+  returnHours: 0.6,
+};
+
 /** Effects of furniture. Hooks for later: lighting, guards, gift shop... */
 export const FIXTURE_EFFECTS = {
   /** Each bar adds this much to event satisfaction. */
