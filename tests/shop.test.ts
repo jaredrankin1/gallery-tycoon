@@ -123,6 +123,13 @@ describe('gift shop', () => {
     expect(shopIncome(withIt)).toBeGreaterThan(shopIncome(without));
   });
 
+  it('keeps the books tidy: one gift shop line and one ticket line a day', () => {
+    const s = days(withShop('museum'), 1);
+    const today = s.ledger.filter((e) => e.day === s.day - 1);
+    expect(today.filter((e) => e.note === 'Gift shop sales')).toHaveLength(1);
+    expect(today.filter((e) => e.note === 'Ticket sales')).toHaveLength(1);
+  });
+
   it('stays deterministic for a seed', () => {
     const play = () => days(withShop('museum', 9), 5);
     expect(play()).toEqual(play());
