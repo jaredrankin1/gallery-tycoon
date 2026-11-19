@@ -9,7 +9,8 @@ import {
   type EventKind,
   type HospitalityTier,
 } from '../../game';
-import { Avatar, money, Sheet } from '../bits';
+import { Avatar, money, Seg, Sheet } from '../bits';
+import { ExhibitionPanel } from './Exhibition';
 import { useGame, type EventDraft } from '../context';
 import { Icon } from '../icons';
 
@@ -24,9 +25,29 @@ export function EventsSheet() {
 
   if (d) return <Planner draft={d} />;
 
+  const tabs = (
+    <Seg
+      options={[
+        { value: 'show', label: state.exhibition ? 'Exhibition · on' : 'Exhibition' },
+        { value: 'events', label: `Events (${state.events.length})` },
+      ]}
+      value={ui.eventsTab}
+      onPick={(v) => setUi({ eventsTab: v })}
+    />
+  );
+
+  if (ui.eventsTab === 'show') {
+    return (
+      <Sheet title="Shows & events" onClose={() => setUi({ sheet: null })}>
+        {tabs}
+        <ExhibitionPanel />
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet
-      title="Events"
+      title="Shows & events"
       onClose={() => setUi({ sheet: null })}
       footer={
         <button class="btn primary wide" onClick={startDraft}>
@@ -34,6 +55,7 @@ export function EventsSheet() {
         </button>
       }
     >
+      {tabs}
       {!state.events.length && (
         <div class="empty">
           <Icon name="events" size={36} />

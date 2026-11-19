@@ -1,9 +1,11 @@
-import { CHEESE_PER_GUEST, DIFFICULTY, EVENT_KIND, FIXTURE_EFFECTS, WINE_PER_GUEST } from '../config';
+import { CAREER, CHEESE_PER_GUEST, DIFFICULTY, EVENT_KIND, FIXTURE_EFFECTS, WINE_PER_GUEST } from '../config';
 import { countFixtures } from './floor';
 import { clamp, Rng } from '../rng';
 import type { EventResult, GameState, HospitalityPlan, ScheduledEvent } from '../types';
 import { getVenueModel } from '../venues';
 import { adjustRelationship } from './artists';
+import { addFame } from './careers';
+import { exhibitionEventBoost } from './exhibitions';
 import { notify } from './feed';
 import { eventGuests } from './visits';
 import { post } from './ledger';
@@ -23,7 +25,7 @@ export function expectedAttendance(state: GameState, kind: ScheduledEvent['kind'
   const cfg = EVENT_KIND[kind];
   const fame = featuredArtistIds.reduce((s, id) => s + (state.artists[id]?.fame ?? 0), 0);
   return Math.round(
-    cfg.baseAttendance * DIFFICULTY[state.difficulty].demandMultiplier * (0.5 + state.reputation / 50) * (1 + fame / 100),
+    cfg.baseAttendance * DIFFICULTY[state.difficulty].demandMultiplier * (0.5 + state.reputation / 50) * (1 + fame / 100) * exhibitionEventBoost(state, featuredArtistIds),
   );
 }
 
@@ -73,6 +75,8 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
       }
     }
     relationshipDeltas[artistId] = adjustRelationship(state, artistId, delta);
+    // A good night out raises their profile.
+    addFame(state, artistId, cfg.prestige * CAREER.eventFame * satisfaction, 'the ' + cfg.short.toLowerCase());
   }
 
   const venue = getVenueModel(state.venue);

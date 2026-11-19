@@ -2,12 +2,14 @@ import { EVENT_KIND, FIXTURE, RULES } from './config';
 import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
-import { ensureStaff, staffUpdate } from './systems/autohang';
+import { ensureStaff, park, staffUpdate, unpark } from './systems/autohang';
+import { closeExhibition, mountExhibition } from './systems/exhibitions';
+import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/patronage';
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
 import { stepHour } from './clock';
-import type { BudgetPlan, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from './types';
+import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, StipendTier } from './types';
 import { getVenueModel } from './venues';
 import { absHour } from './systems/visits';
 
@@ -26,6 +28,13 @@ export type Action =
   | { type: 'setBudget'; budget: BudgetPlan }
   /** Marisol places new art herself (makes room, builds a spot if affordable, hangs it). */
   | { type: 'setAutoHang'; on: boolean }
+  /** Patronage: put an artist on a weekly stipend, change it, or end it. */
+  | { type: 'signPatron'; artistId: Id; tier: StipendTier }
+  | { type: 'setStipend'; artistId: Id; tier: StipendTier }
+  | { type: 'endPatronage'; artistId: Id }
+  /** Open a themed show built from what's on the walls, or close it early. */
+  | { type: 'mountExhibition'; theme: ExhibitionTheme }
+  | { type: 'closeExhibition' }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -66,6 +75,7 @@ function apply(state: GameState, action: Action): string | void {
       if (!action.display) {
         unhang(state, work.id);
         work.status = 'storage';
+        park(state, work.id);
         return;
       }
       const target = action.fixtureId
@@ -75,7 +85,11 @@ function apply(state: GameState, action: Action): string | void {
       if (!FIXTURE[target.kind].display) return 'You can’t hang art on that.';
       if (!fitsOn(work, target.kind)) return work.form === 'sculpture' ? 'Sculpture goes on a pedestal.' : 'That piece needs a wall.';
       // Swapping: whatever was there goes back to storage.
-      if (target.artworkId && target.artworkId !== work.id) state.artworks[target.artworkId].status = 'storage';
+      if (target.artworkId && target.artworkId !== work.id) {
+        state.artworks[target.artworkId].status = 'storage';
+        park(state, target.artworkId);
+      }
+      unpark(state, work.id);
       unhang(state, work.id);
       target.artworkId = work.id;
       work.status = 'display';
@@ -94,7 +108,10 @@ function apply(state: GameState, action: Action): string | void {
       const idx = state.floor.fixtures.findIndex((f) => f.id === action.fixtureId);
       if (idx < 0) return 'Nothing there.';
       const [f] = state.floor.fixtures.splice(idx, 1);
-      if (f.artworkId) state.artworks[f.artworkId].status = 'storage';
+      if (f.artworkId) {
+        state.artworks[f.artworkId].status = 'storage';
+        park(state, f.artworkId);
+      }
       return;
     }
     case 'setPrice': {
@@ -118,6 +135,8 @@ function apply(state: GameState, action: Action): string | void {
       post(state, 'artist-care', -RULES.studioVisitCost, `Studio visit: ${artist.name}`);
       adjustRelationship(state, artist.id, RULES.studioVisitGain);
       artist.lastVisitDay = state.day;
+      artist.studioVisits += 1;
+      wardOffRival(state, artist);
       return;
     }
     case 'scheduleEvent': {
@@ -167,9 +186,27 @@ function apply(state: GameState, action: Action): string | void {
       ensureStaff(state).autoHang = action.on;
       return;
     }
+    case 'signPatron':
+      return signPatron(state, action.artistId, action.tier);
+    case 'setStipend':
+      return setStipend(state, action.artistId, action.tier);
+    case 'endPatronage':
+      return endPatronage(state, action.artistId);
+    case 'mountExhibition': {
+      const rng = new Rng(state.rng);
+      const err = mountExhibition(state, action.theme, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'closeExhibition':
+      return closeExhibition(state, true);
     case 'tick': {
       const rng = new Rng(state.rng);
-      for (let i = 0; i < action.hours && state.status === 'playing'; i++) stepHour(state, rng);
+      for (let i = 0; i < action.hours && state.status === 'playing'; i++) {
+        stepHour(state, rng);
+        // Marisol works hour by hour too, so a long skip still sees her clear the storeroom.
+        staffUpdate(state, absHour(state));
+      }
       state.rng = rng.state;
       return;
     }

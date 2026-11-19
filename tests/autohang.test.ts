@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absHour, AUTO_HANG, assistantPose, createNewGame, dispatch, FIXTURE, shownOnFixture, TIME, type Action, type Artwork, type GameState } from '../src/game';
+import { absHour, assistantPose, buildReserve, createNewGame, dispatch, FIXTURE, shownOnFixture, TIME, type Action, type Artwork, type GameState } from '../src/game';
 
 const run = (s: GameState, a: Action) => {
   const r = dispatch(s, a);
@@ -7,13 +7,14 @@ const run = (s: GameState, a: Action) => {
   return r.state;
 };
 
-const game = (autoHang = true) => createNewGame({ name: 'x', difficulty: 'normal', venue: 'gallery', seed: 7, autoHang });
+const game = (autoHang = true, venue: 'gallery' | 'museum' = 'gallery') => createNewGame({ name: 'x', difficulty: 'normal', venue, seed: 7, autoHang });
 
 /** A work turns up in storage (as a sponsored artist's delivery does). */
+const arriveAt = (...a: Parameters<typeof arrive>) => arrive(...a);
 function arrive(s: GameState, id: string, value: number, form?: Artwork['form'], hours = 6): GameState {
   const next = structuredClone(s);
   const artistId = Object.keys(next.artists)[0];
-  next.artworks[id] = { id, title: id, artistId, value, acquiredFor: 0, price: value, status: 'storage', day: next.day, ...(form ? { form } : {}) } as Artwork;
+  next.artworks[id] = { id, title: id, artistId, value, grade: value / 1000, acquiredFor: 0, price: value, status: 'storage', day: next.day, ...(form ? { form } : {}) } as Artwork;
   return run(next, { type: 'tick', hours });
 }
 
@@ -21,7 +22,7 @@ function arrive(s: GameState, id: string, value: number, form?: Artwork['form'],
 function offer(s: GameState, id: string, value: number, form?: Artwork['form']): GameState {
   const next = structuredClone(s);
   const artistId = Object.keys(next.artists)[0];
-  next.artworks[id] = { id, title: id, artistId, value, acquiredFor: 0, price: value, status: 'offered', day: next.day + 3, ...(form ? { form } : {}) } as Artwork;
+  next.artworks[id] = { id, title: id, artistId, value, grade: value / 1000, acquiredFor: 0, price: value, status: 'offered', day: next.day + 3, ...(form ? { form } : {}) } as Artwork;
   return next;
 }
 
@@ -58,7 +59,7 @@ describe('auto-hang', () => {
   });
 
   it('picks up deliveries that arrive on their own', () => {
-    const s = arrive(game(), 'w-d', 2000);
+    const s = arrive(game(), 'w-d', 2000, undefined, 1);
     expect(s.artworks['w-d'].status).toBe('display');
     expect(s.staff!.jobs[0].start).toBe(absHour(s));
   });
@@ -79,8 +80,10 @@ describe('auto-hang', () => {
   });
 
   it('swaps out the weakest piece when it cannot build, and leaves a weaker newcomer in storage', () => {
-    let s = game();
-    s.cash = AUTO_HANG.cashReserve; // nothing to spare on fixtures
+    // A museum, so nothing on the walls sells while the test runs.
+    let s = game(true, 'museum');
+    // Nothing to spare on fixtures, however the takings go.
+    const arrive = (st: GameState, id: string, value: number) => arriveAt(Object.assign(structuredClone(st), { cash: buildReserve(st) }), id, value, undefined, 1);
     const n = walls(s).length;
     for (let i = 0; i < n; i++) s = arrive(s, `w-${i}`, 1000 * (i + 1));
     s = arrive(s, 'w-big', 50_000);
@@ -106,7 +109,7 @@ describe('auto-hang', () => {
     expect(f.x).toBeGreaterThanOrEqual(2);
     expect(f.y).toBeGreaterThanOrEqual(2);
 
-    s.cash = AUTO_HANG.cashReserve;
+    s.cash = buildReserve(s);
     for (const w of walls(s)) if (!w.artworkId) s = arrive(s, `fill-${w.id}`, 99_000);
     s = arrive(s, 'p-huge', 1_000_000);
     expect(s.artworks['s-1'].status).toBe('display');
@@ -133,12 +136,80 @@ describe('auto-hang', () => {
     expect(s.staff!.jobs).toHaveLength(0);
   });
 
-  it('can be switched on for a running game, and only handles what comes in afterwards', () => {
+  it('can be switched on for a running game, and then clears what was already in storage', () => {
     let s = arrive(game(false), 'w-old', 1000);
     expect(s.artworks['w-old'].status).toBe('storage');
     s = run(s, { type: 'setAutoHang', on: true });
-    s = arrive(s, 'w-new', 1000);
-    expect(s.artworks['w-old'].status).toBe('storage');
-    expect(s.artworks['w-new'].status).toBe('display');
+    s = run(s, { type: 'tick', hours: 1 });
+    expect(s.artworks['w-old'].status).toBe('display');
+  });
+
+  it('builds spots for a storeroom backlog, one piece at a time, without dipping below the reserve', () => {
+    let s = game(true, 'museum');
+    const nWalls = walls(s).length;
+    const nPeds = s.floor.fixtures.filter((f) => f.kind === 'pedestal').length;
+    // Twelve paintings and three sculptures were sitting in storage before she was asked to help.
+    s = run(s, { type: 'setAutoHang', on: false });
+    const next = structuredClone(s);
+    const artistId = Object.keys(next.artists)[0];
+    const add = (id: string, form?: Artwork['form']) =>
+      (next.artworks[id] = { id, title: id, artistId, value: 1000, grade: 1, acquiredFor: 0, price: 1000, status: 'storage', day: next.day, ...(form ? { form } : {}) } as Artwork);
+    for (let i = 0; i < nWalls + 4; i++) add(`p-${i}`);
+    for (let i = 0; i < nPeds + 3; i++) add(`s-${i}`, 'sculpture');
+    next.staff!.seen.push(...Object.keys(next.artworks));
+    const waiting = (st: GameState) => Object.values(st.artworks).filter((w) => w.status === 'storage').length;
+    const before = waiting(next);
+    s = run(next, { type: 'setAutoHang', on: true });
+
+    // An hour in, she's only started on the pile.
+    s = run(s, { type: 'tick', hours: 1 });
+    expect(waiting(s)).toBeGreaterThan(before - 3);
+    expect(waiting(s)).toBeLessThan(before);
+
+    // A couple of days later everything is up, on spots she had built.
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay * 2 });
+    expect(waiting(s)).toBe(0);
+    expect(walls(s).length).toBeGreaterThanOrEqual(nWalls + 4);
+    expect(s.floor.fixtures.filter((f) => f.kind === 'pedestal').length).toBeGreaterThanOrEqual(nPeds + 3);
+    expect(s.floor.fixtures.filter((f) => f.kind === 'pedestal' && f.artworkId).every((f) => s.artworks[f.artworkId!].form === 'sculpture')).toBe(true);
+  });
+
+  it('stops building when cash is down to the reserve, and carries on once it recovers', () => {
+    let s = game(true, 'museum');
+    const nWalls = walls(s).length;
+    const next = structuredClone(s);
+    const artistId = Object.keys(next.artists)[0];
+    for (let i = 0; i < nWalls + 3; i++)
+      next.artworks[`p-${i}`] = { id: `p-${i}`, title: `p-${i}`, artistId, value: 1000, grade: 1, acquiredFor: 0, price: 1000, status: 'storage', day: next.day } as Artwork;
+    next.staff!.seen.push(...Object.keys(next.artworks));
+    next.cash = buildReserve(next) + FIXTURE.wallHang.cost - 1;
+    next.settings.ticketPrice = 0;
+    // Hour by hour: any spot she builds leaves at least the reserve in the bank (a donation may let her build one).
+    s = next;
+    const said: string[] = [];
+    for (let h = 0; h < TIME.ticksPerDay * 2; h++) {
+      const had = walls(s).length;
+      s = run(s, { type: 'tick', hours: 1 });
+      if (walls(s).length > had) expect(s.cash).toBeGreaterThanOrEqual(buildReserve(s));
+      said.push(...s.feed.map((f) => f.text));
+    }
+    expect(walls(s).length).toBeLessThan(nWalls + 3);
+    expect(said.some((t) => t.includes('waiting in storage'))).toBe(true);
+
+    s = structuredClone(s);
+    s.cash += 50_000;
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay * 2 });
+    expect(walls(s).length).toBeGreaterThanOrEqual(nWalls + 3);
+    expect(Object.values(s.artworks).filter((w) => w.id.startsWith('p-') && w.status === 'storage')).toHaveLength(0);
+  });
+
+  it('never puts back a piece the player took down', () => {
+    let s = arrive(game(), 'w-a', 1000);
+    s = run(s, { type: 'setDisplay', artworkId: 'w-a', display: false });
+    s = run(s, { type: 'tick', hours: TIME.ticksPerDay * 2 });
+    expect(s.artworks['w-a'].status).toBe('storage');
+    // Hanging it again by hand makes it hers to look after once more.
+    s = run(s, { type: 'setDisplay', artworkId: 'w-a', display: true });
+    expect(s.staff!.parked).not.toContain('w-a');
   });
 });

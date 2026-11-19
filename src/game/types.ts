@@ -28,6 +28,36 @@ export interface Artist {
   traits: string[];
   /** What their work is like. Guests' tastes are matched against these. */
   tags: string[];
+  /** Where their career is heading, 0..100. Fame drifts toward it. Hidden until scouted. */
+  potential: number;
+  /** Studio visits so far. Enough of them reveal their potential. */
+  studioVisits: number;
+  /** 0..100: how good what they're making right now is. Drifts day to day. */
+  form: number;
+  /** Current creative phase: an extra tag on everything they make while it lasts. */
+  phase?: string;
+  /** Fame a week ago, for the trend arrow. */
+  fameLastWeek: number;
+  /** Set while you are their patron. */
+  patron?: Patronage;
+  /** Signed to a rival gallery: you can't take them on again until this day. */
+  rivalUntil?: number;
+}
+
+export type StipendTier = 'modest' | 'fair' | 'generous';
+
+/** A patronage deal: you pay a weekly stipend, they send you work now and then. */
+export interface Patronage {
+  tier: StipendTier;
+  /** Weekly stipend, fixed when the deal is signed or changed. */
+  stipend: number;
+  since: number;
+  /** Works delivered under this deal. */
+  delivered: number;
+  lastDeliveryDay: number;
+  /** Day a rival gallery started courting them. Cleared once you win them back. */
+  courtedDay?: number;
+  courtedBy?: string;
 }
 
 /** painting: walls or an easel on a pedestal. sculpture: pedestals only. hanging: walls only, no frame. */
@@ -54,6 +84,41 @@ export interface Artwork {
   form?: ArtForm;
   /** Extra tags for this one work, on top of the artist's. */
   tags?: string[];
+  /** How strong this piece is: a multiplier on the artist's going rate. Value follows fame. */
+  grade: number;
+  /** Delivered by an artist you sponsor. */
+  commissioned?: boolean;
+}
+
+// ---- Exhibitions: themed shows that run for a week -----------------------------
+
+export type ExhibitionTheme = { kind: 'tag'; tag: string } | { kind: 'solo'; artistId: Id };
+
+export interface Exhibition {
+  id: Id;
+  title: string;
+  theme: ExhibitionTheme;
+  startDay: number;
+  /** Last day it runs. It comes down at the end of this day. */
+  endDay: number;
+  /** Synergy when it opened, 0..1. */
+  openingScore: number;
+  /** Critics' verdict on opening day, 1..5. */
+  stars: number;
+  visitors: number;
+  sales: number;
+  revenue: number;
+}
+
+export interface ExhibitionSummary {
+  title: string;
+  theme: ExhibitionTheme;
+  startDay: number;
+  endDay: number;
+  stars: number;
+  visitors: number;
+  sales: number;
+  revenue: number;
 }
 
 export type EventKind = 'opening' | 'reception' | 'talk' | 'gala';
@@ -104,6 +169,8 @@ export type LedgerCategory =
   | 'rent'
   | 'staff'
   | 'artist-care'
+  | 'patronage'
+  | 'exhibitions'
   | 'fit-out'
   | 'sales'
   | 'tickets'
@@ -126,7 +193,7 @@ export interface DayReport {
   sales: number;
 }
 
-export type FeedKind = 'staff' | 'sale' | 'tickets' | 'event' | 'artist' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
+export type FeedKind = 'staff' | 'sale' | 'tickets' | 'event' | 'artist' | 'delivery' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
 
 /** Something worth telling the player about, as it happens. The UI shows new ones as toasts. */
 export interface FeedItem {
@@ -287,11 +354,15 @@ export interface StaffState {
   autoHang: boolean;
   /** Works she has already dealt with (or that were already here when auto-hang came on). */
   seen: Id[];
+  /** Works the player took down or moved aside. She leaves these in storage. */
+  parked?: Id[];
+  /** Last day she said the backlog is waiting on cash, so she says it once a day. */
+  backlogNoteDay?: number;
   jobs: HangJob[];
 }
 
 export interface GameState {
-  version: 4;
+  version: 5;
   name: string;
   difficulty: Difficulty;
   venue: VenueType;
@@ -313,6 +384,10 @@ export interface GameState {
   /** Word of mouth from photos and posts. Extra daily visitors; decays every day. */
   buzz: number;
   events: ScheduledEvent[];
+  /** The themed show on right now, if any. */
+  exhibition: Exhibition | null;
+  /** Past shows, newest last. */
+  exhibitionHistory: ExhibitionSummary[];
   ledger: LedgerEntry[];
   /** Running totals for the day in progress. */
   today: DayReport;

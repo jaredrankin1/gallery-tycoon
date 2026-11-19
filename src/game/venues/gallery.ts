@@ -1,6 +1,8 @@
-import { DIFFICULTY, RULES, trafficShare } from '../config';
+import { CAREER, DIFFICULTY, RULES, trafficShare } from '../config';
 import { clamp } from '../rng';
 import { adjustRelationship } from '../systems/artists';
+import { addFame } from '../systems/careers';
+import { exhibitionCrowd, exhibitionSaleBoost, recordExhibitionSale } from '../systems/exhibitions';
 import { notify } from '../systems/feed';
 import { unhang } from '../systems/floor';
 import { post } from '../systems/ledger';
@@ -17,6 +19,7 @@ function saleChance(state: GameState, work: Artwork, boost: number): number {
       (0.5 + state.reputation / 100) *
       (0.6 + (artist?.fame ?? 0) / 100) *
       priceFactor *
+      exhibitionSaleBoost(state, work) *
       boost,
     0,
     0.9,
@@ -41,6 +44,9 @@ export function sellArtwork(state: GameState, work: Artwork, where: string, gues
   // Artists like seeing their work find a home, and like it more when it sells well.
   const premium = work.price / Math.max(1, work.value);
   adjustRelationship(state, work.artistId, premium >= 1 ? 4 : 1);
+  // Every sale is a little proof the market wants them.
+  addFame(state, work.artistId, CAREER.saleFame + (premium >= 1 ? CAREER.premiumSaleFame : 0));
+  recordExhibitionSale(state, work);
 }
 
 const displayed = (state: GameState) => Object.values(state.artworks).filter((w) => w.status === 'display');
@@ -51,7 +57,8 @@ export const galleryModel: VenueModel = {
   expectedDailyVisitors(state) {
     return Math.round(
       ((5 + displayed(state).length * 1.5) * (0.5 + state.reputation / 50) * DIFFICULTY[state.difficulty].demandMultiplier + state.buzz) *
-        RULES.galleryFootfall,
+        RULES.galleryFootfall *
+        exhibitionCrowd(state),
     );
   },
 

@@ -26,6 +26,8 @@ export interface Ui {
   guest: string | null;
   /** Which list the People sheet shows. */
   peopleTab: 'guests' | 'artists';
+  /** Which half of the Events sheet: the themed show, or one-night events. */
+  eventsTab: 'show' | 'events';
   /** First-run tip pointing at the Art button. */
   coach: boolean;
 }

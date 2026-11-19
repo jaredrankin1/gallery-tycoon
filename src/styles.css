@@ -364,3 +364,55 @@ q.said::after { content: '”'; }
 .autohang .knob::after { content: ''; position: absolute; top: 0.8cqw; left: 0.8cqw; width: 4.8cqw; height: 4.8cqw; border-radius: 50%; background: #e9e1d4; transition: transform 0.15s; }
 .autohang.on .knob { background: var(--accent); }
 .autohang.on .knob::after { transform: translateX(4.6cqw); }
+/* ---- Careers, patronage, exhibitions ---- */
+.show-chip { border: 0; color: var(--text); background: #5a4a2a; max-width: 19cqw; overflow: hidden; font-size: 0.66em; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.up { color: var(--good); }
+.down { color: var(--bad); }
+.gold { color: var(--accent); }
+.fame-row { display: flex; align-items: center; gap: 2cqw; }
+.trend { white-space: nowrap; color: var(--muted); }
+.trend.up { color: var(--good); }
+.trend.down { color: var(--bad); }
+.stars { color: var(--accent); letter-spacing: 0.08em; white-space: nowrap; }
+.stars i { font-style: normal; opacity: 0.25; }
+.stars.big { font-size: 1.3em; }
+.tag.phase { color: #c9a4e8; }
+.artist.sponsored { border-color: var(--accent); }
+.patron { background: var(--ink); border-radius: var(--r); padding: 2.6cqw; display: flex; flex-direction: column; gap: 2cqw; }
+.patron.courted { box-shadow: inset 0 0 0 1px var(--bad); }
+.patron-head { display: flex; flex-wrap: wrap; align-items: center; gap: 1.4cqw 2cqw; color: var(--accent); }
+.patron-head small { flex-basis: 100%; }
+.warn-line { color: var(--bad); font-size: 0.8em; }
+.warn-line.soft { color: var(--muted); }
+.stipends { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.6cqw; }
+.stipends button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4cqw; background: var(--card); border: 1px solid var(--line); border-radius: calc(var(--r) - 0.6cqw); padding: 2cqw; text-align: left; }
+.stipends button.on { border-color: var(--accent); background: #3a3020; }
+.stipends small { font-variant-numeric: tabular-nums; }
+.stipends i { font-style: normal; font-size: 0.68em; color: var(--muted); }
+.sponsor-btn { font-size: 0.88em; }
+.why { display: block; font-size: 0.75em; }
+
+.show { display: flex; flex-direction: column; gap: 2.4cqw; margin-top: 3cqw; }
+.show h3 { font-family: var(--display); font-size: 1.35em; font-weight: 600; }
+.show-head { display: flex; flex-direction: column; gap: 1cqw; }
+.show-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2cqw; }
+.show-stats > div { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 2.4cqw; display: flex; flex-direction: column; }
+.show-stats b { font-size: 1.15em; font-variant-numeric: tabular-nums; }
+.show-stats small { color: var(--muted); }
+.show .label { margin: 1.6cqw 0 0; }
+.theme-chips { display: flex; flex-wrap: wrap; gap: 1.6cqw; }
+.theme-chip { display: inline-flex; align-items: center; gap: 1.4cqw; background: var(--card); border: 1px solid var(--line); border-radius: 99px; padding: 1.2cqw 2.6cqw; font-size: 0.8em; color: var(--muted); }
+.theme-chip.ready { color: var(--text); }
+.theme-chip.on { border-color: var(--accent); background: #3a3020; color: var(--text); }
+.theme-chip i { font-style: normal; font-variant-numeric: tabular-nums; background: var(--ink); border-radius: 99px; padding: 0 1.4cqw; font-size: 0.9em; }
+.theme-chip .avatar.sm { width: 5cqw; height: 5cqw; font-size: 0.55em; }
+.show-preview { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 3cqw; display: flex; flex-direction: column; gap: 2cqw; }
+.show-works { display: flex; flex-wrap: wrap; gap: 1.4cqw; }
+.bonuses { display: flex; flex-direction: column; gap: 1.2cqw; }
+.bonus { display: grid; grid-template-columns: 1fr auto; column-gap: 2cqw; font-size: 0.85em; }
+.bonus small { grid-column: 1; grid-row: 2; }
+.bonus .num { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--good); font-weight: 650; }
+.bonus.neg .num { color: var(--bad); }
+.past-show .stars { font-size: 0.8em; }
+.patron > .btn.tiny { align-self: flex-start; }
+.show .meter { flex: none; }

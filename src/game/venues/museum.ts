@@ -1,6 +1,7 @@
 import { DIFFICULTY, FIXTURE_EFFECTS, RULES, TIME, trafficShare } from '../config';
 import { clamp } from '../rng';
 import { notify } from '../systems/feed';
+import { exhibitionCrowd } from '../systems/exhibitions';
 import { countFixtures } from '../systems/floor';
 import { post } from '../systems/ledger';
 import type { GameState } from '../types';
@@ -23,6 +24,7 @@ export const museumModel: VenueModel = {
 
   expectedDailyVisitors(state) {
     return Math.round(
+      exhibitionCrowd(state) *
       RULES.museumBaseVisitors *
         DIFFICULTY[state.difficulty].demandMultiplier *
         (0.3 + state.reputation / 50) *

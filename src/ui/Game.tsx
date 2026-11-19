@@ -34,7 +34,7 @@ const DOCK: { id: SheetId | 'build'; label: string; icon: string }[] = [
 
 export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store; onQuit: () => void; onboarding: boolean; onSetupDone: () => void }) {
   const state = useStore(store);
-  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', coach: false });
+  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', coach: false });
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const setUi = useCallback((patch: Partial<Ui>) => setUiState((u) => ({ ...u, ...patch })), []);
@@ -129,10 +129,10 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
       } else if (f.kind === 'tickets') sound.play('coin');
       else if (f.kind === 'event') sound.play('event');
       else if (f.kind === 'warn' || f.kind === 'bills') sound.play('warn');
-      else if (f.kind === 'review' || f.kind === 'guest') sound.play('note');
+      else if (f.kind === 'review' || f.kind === 'guest' || f.kind === 'delivery') sound.play('note');
       const face = f.guestId ? state.guests[f.guestId]?.sprite : undefined;
       const tone: Toast['tone'] =
-        f.kind === 'sale' || f.kind === 'tickets' ? 'sale' : f.kind === 'event' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
+        f.kind === 'sale' || f.kind === 'tickets' ? 'sale' : f.kind === 'event' || f.kind === 'delivery' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
       toast(f.text, tone, face);
     }
   }, [state.feedSeq, onboarding]);
@@ -203,7 +203,15 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
             <div class="clock">
               <span class="dayring" style={{ '--p': dayFraction }} />
               <b>{clockLabel(state.tick)}</b>
-              {tonight && <span class="tonight">{tonight.kind} tonight</span>}
+              {tonight ? (
+                <span class="tonight">{tonight.kind} tonight</span>
+              ) : (
+                state.exhibition && (
+                  <button class="tonight show-chip" onClick={() => setUi({ sheet: 'events', eventsTab: 'show', building: false, selected: null, guest: null })}>
+                    {state.exhibition.title}
+                  </button>
+                )
+              )}
             </div>
             <div class="chips-mini">
               <span class="mini" title="Reputation">
@@ -262,7 +270,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
         <nav class="dock">
           {DOCK.map((d) => {
             const on = d.id === 'build' ? ui.building : ui.sheet === d.id;
-            const badge = d.id === 'events' ? state.events.length : d.id === 'collection' ? Object.values(state.artworks).filter((w) => w.status === 'storage').length : 0;
+            const badge = d.id === 'events' ? state.events.length + (state.exhibition ? 1 : 0) : d.id === 'collection' ? Object.values(state.artworks).filter((w) => w.status === 'storage').length : 0;
             return (
               <button class={`${on ? 'on' : ''} ${ui.coach && d.id === 'collection' ? 'pulse' : ''}`} onClick={() => openDock(d.id)}>
                 <span class="dock-icon">

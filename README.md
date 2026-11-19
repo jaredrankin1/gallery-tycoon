@@ -39,6 +39,9 @@ goes dark.
 - **Crowd**: every visitor the game counts walks in as a person, one for one. Members of the public wear recoloured outfits so they never pass for the named characters; the people icon in the top bar is exactly how many are on the floor right now. Events fill the room with their whole attendance.
 - **Visitors**: twelve named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
 - **Artists** (under People): studio visits build relationships, and neglect cools them. "Give a show" opens the event planner with that artist already picked.
+- **Patronage**: sponsor up to three artists on a weekly stipend (Modest, Fair or Generous). They deliver new work straight into storage at random intervals, and the stipend shapes how good it is (their *form*) and how loyal they stay. Underpaid or unhappy artists get courted by rival galleries: you get a week's warning to raise the stipend or win them back before they leave, and they're off the market for four weeks after. Artists also drift into new creative *phases* (moody, retro, fantasy...) that tag everything they make for a while. Sponsored artists' work stops appearing on the open market.
+- **Careers**: every artist has fame and a hidden *potential*. Fame rises with shows, sales and critics' reviews, and drifts toward potential (faster for artists you sponsor), with the odd breakout or flop. Two studio visits reveal an artist's potential as stars. A work's value follows its artist's fame, so a piece bought from an unknown can become the most valuable thing you own. Career stages (Unknown, Emerging, Established, Acclaimed, Blue-chip) are announced, and the Art sheet shows each work's gain or loss since you bought it.
+- **Exhibitions** (Events → Exhibition): pick a theme (a style tag such as "After Dark", or a solo show for one artist) and open a week-long show built from what's on the walls. Synergy scores how well the walls hang together: share of works on theme, depth, range of artists, a famous headliner, an unknown discovery, fresh work from your sponsored artists and strong pieces, minus repeats of a recent theme. Critics review it on opening day (reputation, and fame for the artists in it). While it runs, crowds rise, on-theme works sell faster, and events featuring its artists draw more people. Swapping pictures changes the live synergy.
 - **Events**: book an opening, reception, talk or gala on a future night. Choose featured artists, wine and cheese tiers, and how many guests to cater for. Events happen at 7 PM, with a crowd holding glasses on the floor.
 - **Books**: the last 14 days of income and spending, weekly art and wine & cheese budgets, the ticket price (museum), and the ledger.
 
@@ -71,7 +74,10 @@ src/
     rng.ts              Seeded RNG, so runs and tests are reproducible
     save.ts             localStorage save/load (versioned)
     systems/
-      artists.ts        Relationships, neglect, fame drift, pricing hooks
+      artists.ts        Relationships, neglect, display exposure
+      careers.ts        Fame, potential, career stages, work values that follow fame
+      patronage.ts      Stipends, deliveries, form, creative phases, rival galleries
+      exhibitions.ts    Themed shows: synergy scoring, opening reviews, crowd and sales boosts
       market.ts         Weekly art offers
       events.ts         Event costs, attendance, wine & cheese satisfaction, persona reactions
       floor.ts          Isometric floor plan: fixtures, placement rules, hanging

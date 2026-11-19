@@ -1,4 +1,5 @@
-import { FIXTURE, GUESTS, TIME, trafficShare } from '../config';
+import { addFame } from './careers';
+import { CAREER, FIXTURE, GUESTS, TIME, trafficShare } from '../config';
 import { clamp, type Rng } from '../rng';
 import { GUEST_SEEDS } from '../../data/guests';
 import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, ScheduledEvent, VisitStep } from '../types';
@@ -301,6 +302,8 @@ export function resolveVisit(state: GameState, v: GuestVisit, rng: Rng): void {
     const delta = (n - 3) * (harsh ? GUESTS.harshReviewWeight : GUESTS.reviewWeight);
     state.reputation = clamp(state.reputation + delta, 0, 100);
     notify(state, { kind: 'review', guestId: g.id, text: `${name}’s review ${stars(n)} “${line}”` });
+    // Press: the artists they wrote about rise or fall with the review.
+    for (const id of new Set(seen.map((s) => state.artworks[s.artworkId].artistId))) addFame(state, id, (n - 3) * CAREER.pressFame, 'press');
     said = true;
   }
   // Photos and posts

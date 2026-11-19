@@ -1,7 +1,9 @@
 import type { Artist } from '../game/types';
 
 // Placeholder personas. Add more here; nothing else needs to change.
-export type ArtistSeed = Omit<Artist, 'relationship' | 'lastContactDay'> & { relationship?: number };
+export type ArtistSeed = Omit<Artist, 'relationship' | 'lastContactDay' | 'potential' | 'studioVisits' | 'form' | 'fameLastWeek'> & {
+  relationship?: number;
+};
 
 export const ARTIST_SEEDS: ArtistSeed[] = [
   {

@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
-import { ASSISTANT, getVenueModel, RULES } from '../../game';
-import { ArtThumb, Avatar, money, Seg, Sheet } from '../bits';
+import { ASSISTANT, buildReserve, getVenueModel, RULES } from '../../game';
+import { ArtThumb, Avatar, money, Seg, Sheet, shortMoney } from '../bits';
 import { useGame } from '../context';
 
 export function CollectionSheet() {
@@ -26,10 +26,10 @@ export function CollectionSheet() {
 
       <button class={`autohang ${autoHang ? 'on' : ''}`} role="switch" aria-checked={autoHang} onClick={() => act({ type: 'setAutoHang', on: !autoHang })}>
         <span class="grow">
-          <b>{ASSISTANT.name} hangs new art</b>
+          <b>{ASSISTANT.name} hangs art</b>
           <small class="muted">
             {autoHang
-              ? 'She finds a spot, builds one if you can afford it, or swaps out a weaker piece.'
+              ? `New pieces and anything in storage: she finds a spot, builds one while cash stays above ${money(buildReserve(state))}, or swaps out a weaker piece. Pieces you take down stay down.`
               : 'Off: new pieces wait in storage for you to place.'}
           </small>
         </span>
@@ -85,7 +85,19 @@ export function CollectionSheet() {
                   <div class="grow">
                     <b>“{w.title}”</b>
                     <small class="muted">
-                      {a.name} · {canSell ? `asking ${money(w.price)}` : `worth ${money(w.value)}`}
+                      {a.name}
+                      {w.commissioned && <span class="gold"> · commissioned</span>}
+                    </small>
+                    <small class="muted">
+                      Worth {shortMoney(w.value)}
+                      {w.acquiredFor > 0 && w.value !== w.acquiredFor && (
+                        <span class={w.value > w.acquiredFor ? 'up' : 'down'}>
+                          {' '}
+                          {w.value > w.acquiredFor ? '▲' : '▼'}
+                          {Math.abs(Math.round(((w.value - w.acquiredFor) / w.acquiredFor) * 100))}%
+                        </span>
+                      )}
+                      {canSell && ` · asking ${shortMoney(w.price)}`}
                     </small>
                   </div>
                   {hanging ? (
