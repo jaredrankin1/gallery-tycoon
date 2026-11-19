@@ -190,9 +190,10 @@ class Sound {
       if (this.nextSwap && this.bank.length >= Sound.BANK) this.bank[Math.floor(Math.random() * this.bank.length)] = this.makeWhisper((Math.random() * 2 ** 31) | 0);
       this.nextSwap = now + 4 + Math.random() * 6;
     }
-    const perPerson = party ? 1 / 7 : 1 / 11;
-    const rate = Math.min(party ? 2.6 : 1.8, count * perPerson) * (paused ? 0.25 : 1);
-    const cap = Math.min(party ? 7 : 5, 1 + Math.ceil(count / 3));
+    const perPerson = party ? 1 / 5 : 1 / 7;
+    // Even one or two visitors keep up a quiet back-and-forth.
+    const rate = Math.min(party ? 3 : 2.2, Math.max(0.35, count * perPerson)) * (paused ? 0.25 : 1);
+    const cap = Math.min(party ? 8 : 6, 2 + Math.ceil(count / 3));
     // Poisson arrivals: a random number of whispers, at random moments.
     let n = 0;
     const expect = rate * span;
@@ -205,7 +206,7 @@ class Sound {
       acc += p;
     }
     // Busier rooms: each whisper a touch quieter, so the total stays hushed.
-    const crowdTrim = 1 / Math.sqrt(1 + count / 12);
+    const crowdTrim = 1 / Math.sqrt(1 + count / 16);
     for (let i = 0; i < n && this.live < cap; i++) {
       this.speak(now + 0.02 + Math.random() * span, crowdTrim * (party ? 1.15 : 1));
     }
@@ -224,7 +225,7 @@ class Sound {
     tone.frequency.value = 2200 + near * 4200;
     tone.Q.value = 0.5;
     const g = ctx.createGain();
-    g.gain.value = (0.035 + near * near * 0.075) * level;
+    g.gain.value = (0.12 + near * 0.2) * level;
     const pan = ctx.createStereoPanner();
     pan.pan.value = Math.random() * 1.7 - 0.85;
     src.connect(tone).connect(g).connect(pan).connect(this.whispers!);
