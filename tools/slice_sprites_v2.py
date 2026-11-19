@@ -19,6 +19,7 @@ import os
 import numpy as np
 from PIL import Image
 
+import slice_dust
 from slice_sprites import OUT, ROOT, SCALE, flood_background, label
 
 SRC = os.path.join(ROOT, 'art', 'source', 'v2')
@@ -94,6 +95,24 @@ WAIST_UP = {
 }
 # (left, top, side) of the square portrait crop.
 PORTRAIT = {'sunny': (12, 10, 300), 'beatrix': (12, 24, 300), 'kofi': (8, 10, 296), 'hana': (14, 14, 268), 'assistant': (10, 6, 300)}
+
+
+# Animations that come from a sheet of their own: animation -> loader returning
+# (full-size frames sharing one anchor, feet x). They're scaled to her standing height.
+OWN_SHEETS = {'assistant': {'dust': slice_dust.frames}}
+
+
+def own_frames(load, height):
+    """Frames from a separate sheet, cropped together and scaled so she stands `height` tall."""
+    fs, feet = load()
+    alpha = np.stack([np.asarray(f)[:, :, 3] > 0 for f in fs]).any(0)
+    ys, xs = np.nonzero(alpha)
+    # Her own height: the last frame is her standing straight.
+    last = np.nonzero(np.asarray(fs[-1])[:, :, 3].any(1))[0]
+    k = height / (last[-1] - last[0] + 1)
+    box = (xs.min(), ys.min(), xs.max() + 1, last[-1] + 1)
+    w, h = round((box[2] - box[0]) * k), round((box[3] - box[1]) * k)
+    return [f.crop(box).resize((w, h), Image.LANCZOS) for f in fs], round((feet - box[0]) * k)
 
 
 def figures(name):
@@ -176,19 +195,31 @@ def build(name):
         return add_legs(f, idle) if p in waist else f
 
     frames = {a: [get(p) for p in pts] for a, pts in FRAMES[name].items()}
+    # Feet x for frames that bring their own anchor; the rest are centred on their legs.
+    anchor = {}
+    if name in OWN_SHEETS:
+        for anim, load in OWN_SHEETS[name].items():
+            frames[anim], feet = own_frames(load, idle.height)
+            for f in frames[anim]:
+                anchor[id(f)] = feet
     order = ORDER if set(frames) == set(ORDER) else list(frames)
+
+    def feet_x(f):
+        if id(f) in anchor:
+            return anchor[id(f)]
+        a = np.asarray(f)[:, :, 3] > 0
+        lower = a[int(f.height * 0.66):]
+        xs = np.where(lower.any(0))[0]
+        return int((xs[0] + xs[-1]) / 2) if len(xs) else f.width // 2
+
     all_f = [f for fs in frames.values() for f in fs]
-    cw = max(f.width for f in all_f)
+    cw = max(2 * max(feet_x(f), f.width - feet_x(f)) for f in all_f)
     ch = max(f.height for f in all_f)
     cols = max(len(frames[k]) for k in order)
     sheet = Image.new('RGBA', (cw * cols, ch * len(order)), (0, 0, 0, 0))
     for r, anim in enumerate(order):
         for c, f in enumerate(frames[anim]):
-            a = np.asarray(f)[:, :, 3] > 0
-            lower = a[int(f.height * 0.66):]
-            xs = np.where(lower.any(0))[0]
-            cx = int((xs[0] + xs[-1]) / 2) if len(xs) else f.width // 2
-            sheet.paste(f, (c * cw + cw // 2 - cx, r * ch + ch - f.height), f)
+            sheet.paste(f, (c * cw + cw // 2 - feet_x(f), r * ch + ch - f.height), f)
     out_w, out_h = int(cw * SCALE), int(ch * SCALE)
     sheet = sheet.resize((out_w * cols, out_h * len(order)), Image.LANCZOS)
     arr = np.asarray(sheet).copy()

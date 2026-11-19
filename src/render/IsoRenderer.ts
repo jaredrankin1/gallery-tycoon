@@ -558,7 +558,11 @@ export class IsoRenderer {
     if (!meta || !img) return;
     const [row, frames] = meta.anims[p.anim] ?? meta.anims.idle;
     const perHour = p.anim === 'walk' ? 15 : 5;
-    const frame = Math.floor(p.local * perHour) % frames;
+    // Dusting plays once across the job, ending on her pleased pose, which holds a little longer.
+    const frame =
+      p.anim === 'dust' && p.span
+        ? Math.min(frames - 1, Math.floor((p.local / p.span) * (frames + 1)))
+        : Math.floor(p.local * perHour) % frames;
     const [cw, ch] = meta.cell;
     const scale = 68 / ch;
     const pt = toScreen(p.x, p.y);

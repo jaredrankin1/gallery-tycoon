@@ -19,6 +19,8 @@ export interface AssistantPose {
   faceLeft: boolean;
   /** Hours into the current action, for animation frames. */
   local: number;
+  /** How long the current action lasts, in hours, when it has a set end (one-shot animations play across it). */
+  span?: number;
 }
 
 /** Each job takes this long, walking there included. */
@@ -76,6 +78,7 @@ export function assistantPose(state: GameState, now: number): AssistantPose {
     };
   }
   // A short pause before getting to work.
-  const anim = t - walk < 0.15 ? 'idle' : job.anim;
-  return { ...job.at, anim, faceLeft: job.faceLeft, local: t - walk };
+  const pause = 0.15;
+  if (t - walk < pause) return { ...job.at, anim: 'idle', faceLeft: job.faceLeft, local: t - walk };
+  return { ...job.at, anim: job.anim, faceLeft: job.faceLeft, local: t - walk - pause, span: SHIFT - walk - pause };
 }
