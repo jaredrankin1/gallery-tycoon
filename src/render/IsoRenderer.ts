@@ -3,6 +3,7 @@ import {
   canPlace,
   poseAt,
   shortName,
+  Steering,
   TIME,
   visitTimeline,
   type AssistantPose,
@@ -66,6 +67,9 @@ export class IsoRenderer {
   /** Visits and photo flashes already heard, so each makes its sound once. */
   private heard = new Set<string>();
   private guestCount = 0;
+  /** Personal space: where people actually stand after making room for each other. */
+  private steering = new Steering();
+  private lastNow: number | null = null;
   /** Real-time ms until which the assistant is cheering. */
   private cheerUntil = 0;
   private highlight: Highlight | null = null;
@@ -311,13 +315,27 @@ export class IsoRenderer {
     const now = this.clock();
     this.guestHits = [];
     this.guestCount = 0;
+    const here: { v: GuestVisit; pose: NonNullable<ReturnType<typeof poseAt>>; key: string }[] = [];
     for (const v of s.visits) {
       if (now < v.start || now >= v.end) continue;
       this.guestCount++;
       // The door bell rings for the regulars and named characters, not every stranger.
       if (!v.look && !v.event && now - v.start < 0.3 && this.once(`in:${v.guestId}@${v.start}`)) this.onSfx('door');
       const pose = poseAt(this.timeline(v), now);
-      if (pose) items.push({ depth: pose.x + pose.y, draw: () => this.drawGuest(v, pose, t) });
+      if (pose) here.push({ v, pose, key: `${v.guestId}@${v.start}` });
+    }
+    // Make room: nobody walks through anybody.
+    const dt = this.lastNow === null ? 0 : Math.max(0, now - this.lastNow);
+    this.lastNow = now;
+    const placed = this.steering.step(
+      here.map(({ pose, key }) => ({ key, x: pose.x, y: pose.y, moving: pose.seg.anim === 'walk' })),
+      dt,
+      s.floor,
+    );
+    for (const { v, pose, key } of here) {
+      const at = placed.get(key);
+      const p = at ? { ...pose, x: at.x, y: at.y } : pose;
+      items.push({ depth: p.x + p.y, draw: () => this.drawGuest(v, p, t) });
     }
     const staff = assistantPose(s, now);
     if (performance.now() < this.cheerUntil && staff.anim !== 'walk') staff.anim = 'cheer';
@@ -644,7 +662,7 @@ export class IsoRenderer {
       ctx.fill();
     }
     if (this.selectedGuest === v.guestId) {
-      const label = g ? shortName(g) : 'Visitor';
+      const label = g ? shortName(g) : (v.name?.split(' ')[0] ?? 'Visitor');
       ctx.font = '700 10px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       const w = ctx.measureText(label).width + 10;

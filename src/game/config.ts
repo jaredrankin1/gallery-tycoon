@@ -209,3 +209,29 @@ export const GUESTS = {
   reviewWeight: 1.4,
   harshReviewWeight: 2.2,
 };
+
+/** Visitor moods (see systems/moods.ts). Every axis runs -1 .. 1. */
+export const MOODS = {
+  /** Others at the same work before it starts to grate (times their patience, 0..1). */
+  crowdTolerance: 3,
+  /** Happiness lost per person over their tolerance. */
+  crowdPenalty: 0.09,
+  /** People per floor tile that starts to feel packed. */
+  packedDensity: 0.22,
+  /** Walk out early below these. */
+  leaveBoredAt: -0.4,
+  leaveUnhappyAt: -0.45,
+  /** Skip a work when this many are already crowding it (impatient people). */
+  skipCrowdAt: 3,
+  /** Gallery: a member of the public leaving at least this covetous may buy what they wanted. */
+  buyAt: 0.45,
+  /** Base chance they do, plus how far past buyAt they are. */
+  buyChance: 0.18,
+  /** Buzz (word of mouth) from one visitor leaving delighted, or lost to one leaving miserable. */
+  wordOfMouth: 0.35,
+  /** Chance a public visitor drifts to an open spot between works (browsing), and how long they linger. */
+  browseChance: 0.3,
+  browseHours: [0.12, 0.3] as const,
+  /** Walking pace varies person to person, as a multiple of GUESTS.walkTilesPerHour. */
+  paceRange: [0.75, 1.2] as const,
+};

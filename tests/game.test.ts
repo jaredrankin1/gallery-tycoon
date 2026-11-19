@@ -175,7 +175,10 @@ describe('guests', () => {
     expect(v).toBeDefined();
     const segs = visitTimeline(v, s.floor);
     expect(segs[0].start).toBe(v.start);
-    expect(segs[0].from).toEqual(segs[segs.length - 1].to);
+    // In through the doorway and out through it, not necessarily at the same spot.
+    const inDoor = (p: { x: number; y: number }) => Math.floor(p.x) === s.floor.entrance.x && Math.floor(p.y) === s.floor.entrance.y;
+    expect(inDoor(segs[0].from)).toBe(true);
+    expect(inDoor(segs[segs.length - 1].to)).toBe(true);
     expect(poseAt(segs, v.start + 0.01)).not.toBeNull();
   });
 });
@@ -257,7 +260,8 @@ describe('around the clock', () => {
       for (const v of s.visits) {
         if (v.start < midnight) crossed++;
         const segs = visitTimeline(v, s.floor);
-        expect(segs[segs.length - 1].to).toEqual({ x: s.floor.entrance.x + 0.5, y: s.floor.entrance.y + 0.5 });
+        const end = segs[segs.length - 1].to;
+        expect([Math.floor(end.x), Math.floor(end.y)]).toEqual([s.floor.entrance.x, s.floor.entrance.y]);
       }
     }
     expect(crossed).toBeGreaterThan(0);
