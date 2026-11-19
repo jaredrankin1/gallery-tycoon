@@ -352,3 +352,18 @@ q.said::after { content: '”'; }
 .art-card .thumb.lg.img { aspect-ratio: 1 / 1; }
 .art-card .thumb.img img { object-position: 50% 30%; }
 .insp-art .thumb.lg.img { width: 24cqw; }
+
+/* ---------- gift shop ---------- */
+.warn { color: var(--accent); }
+.g-shop::before { content: ''; position: absolute; left: 0.6cqw; right: 0.6cqw; bottom: 0; height: 3.4cqw; background: linear-gradient(90deg, #2f6f73 50%, #255a5d 50%); border-radius: 0.4cqw; }
+.g-shop::after { content: ''; position: absolute; left: 1.6cqw; bottom: 3.4cqw; width: 1.8cqw; height: 2.4cqw; background: #f3ede4; box-shadow: 2.4cqw -0.6cqw 0 #e0aa45, 4.8cqw 0 0 #9b2c48, 6.6cqw 0.4cqw 0 -0.3cqw #6d8fb8; }
+.merch { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 2.4cqw 3cqw; display: flex; flex-direction: column; gap: 1.6cqw; }
+.merch b, .merch small { display: block; }
+.merch .row > small { flex: 1; min-width: 0; font-size: 0.74em; }
+.merch-icon { font-size: 1.4em; width: 8cqw; text-align: center; }
+.merch-price { min-width: 11cqw; text-align: center; align-self: center; }
+.merch .stepper { align-items: center; }
+.toggle-row { display: flex; gap: 3cqw; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 3cqw; margin-top: 3cqw; }
+.toggle-row input { width: 5cqw; height: 5cqw; accent-color: var(--accent); margin-top: 0.4cqw; }
+.toggle-row b, .toggle-row small { display: block; }
+.shop-link { width: 100%; text-align: left; color: inherit; font: inherit; }

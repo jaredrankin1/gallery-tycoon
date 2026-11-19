@@ -13,4 +13,5 @@ export { getVenueModel } from './venues';
 export { canPlace, fixtureAt, displayFixtures } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
+export { MERCH_KINDS, buyChance, merchAppeal, merchPriceDemand, shopCounter, takingsPerVisitor } from './systems/shop';
 export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';

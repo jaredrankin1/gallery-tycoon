@@ -5,6 +5,7 @@ import { Rng } from './rng';
 import { createFloor } from './systems/floor';
 import { GUEST_SEEDS } from '../data/guests';
 import { refreshMarket } from './systems/market';
+import { createShop } from './systems/shop';
 import { emptyDay } from './clock';
 import { RULES, TIME } from './config';
 
@@ -42,6 +43,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     visits: [],
     buzz: 0,
     events: [],
+    shop: createShop(),
     ledger: [],
     today: emptyDay(1),
     history: [],

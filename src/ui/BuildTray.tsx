@@ -9,6 +9,7 @@ const HINT: Record<FixtureKind, string> = {
   bar: `Better events: +${Math.round(FIXTURE_EFFECTS.barSatisfaction * 100)}% guest happiness each.`,
   bench: `Museums: +${Math.round(FIXTURE_EFFECTS.benchVisitorBonus * 100)}% visitors each.`,
   plant: 'Purely decorative. Looks nice.',
+  shop: 'Sells postcards, prints, keychains and t-shirts. Opens stocked. One per venue.',
 };
 
 /** Mini drawings of each fixture so the tray reads at a glance. */

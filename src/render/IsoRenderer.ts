@@ -512,6 +512,30 @@ export class IsoRenderer {
         ctx.fill();
         return;
       }
+      case 'shop': {
+        // A teal counter with a postcard rack, a stack of t-shirts and a till.
+        this.box(f.x, f.y, 20, '#2f6f73', '#3b8589', '#255a5d', 0.06);
+        const c = toScreen(f.x + 0.5, f.y + 0.5, 20);
+        // Postcard rack: a little stand with rows of cards.
+        ctx.fillStyle = '#5b4a3a';
+        ctx.fillRect(c.x - 15, c.y - 24, 2, 22);
+        const cards = ['#f3ede4', '#6d8fb8', '#e0aa45', '#9b2c48', '#73c690', '#f3ede4'];
+        cards.forEach((col, i) => {
+          ctx.fillStyle = col;
+          ctx.fillRect(c.x - 20 + (i % 2) * 6, c.y - 24 + Math.floor(i / 2) * 7, 5, 6);
+        });
+        // Folded t-shirts.
+        for (const [dy, col] of [[0, '#9b2c48'], [-3, '#f3ede4'], [-6, '#2b2b2b']] as const) {
+          ctx.fillStyle = col;
+          ctx.fillRect(c.x - 4, c.y - 5 + dy, 11, 3);
+        }
+        // Till.
+        ctx.fillStyle = '#1d1a17';
+        ctx.fillRect(c.x + 10, c.y - 8, 7, 6);
+        ctx.fillStyle = '#e0aa45';
+        ctx.fillRect(c.x + 11, c.y - 7, 5, 2);
+        return;
+      }
       case 'bench':
         this.box(f.x, f.y, 9, '#6b4f3a', '#4e392a', '#433024', 0.2);
         return;

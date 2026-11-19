@@ -1,4 +1,4 @@
-import { getVenueModel, priceDemand, spentThisWeek, weekday } from '../../game';
+import { getVenueModel, MERCH_KINDS, priceDemand, shopCounter, spentThisWeek, weekday } from '../../game';
 import { Meter, money, shortMoney, Sheet } from '../bits';
 import { useGame } from '../context';
 
@@ -92,6 +92,19 @@ export function BooksSheet() {
           </div>
         </>
       )}
+
+      <h3 class="section">Gift shop</h3>
+      <button class="list-row shop-link" onClick={() => setUi({ sheet: 'shop' })}>
+        <div class="grow">
+          <b>{shopCounter(state) ? `Takings today: ${money(state.shop.takingsToday)}` : 'No gift shop yet'}</b>
+          <small class="muted">
+            {shopCounter(state)
+              ? `${MERCH_KINDS.filter((k) => state.shop.lines[k].stock === 0).length || 'Nothing'} sold out · prices and stock`
+              : 'Postcards, prints, keychains and t-shirts'}
+          </small>
+        </div>
+        <span class="muted">›</span>
+      </button>
 
       <h3 class="section">Ledger</h3>
       <div class="ledger">

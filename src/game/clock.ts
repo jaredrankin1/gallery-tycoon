@@ -5,6 +5,7 @@ import { resolveEvent } from './systems/events';
 import { notify } from './systems/feed';
 import { post } from './systems/ledger';
 import { refreshMarket } from './systems/market';
+import { shopEndOfDay, shopSales } from './systems/shop';
 import { hourOfGuests } from './systems/visits';
 import type { DayReport, GameState } from './types';
 import { getVenueModel } from './venues';
@@ -25,9 +26,9 @@ export function clockLabel(tick: number): string {
  * timer (faster or slower with the speed setting); tests call it directly.
  *
  * Order within an hour:
- *  1. Normal trading (sales roll or tickets trickle in)
+ *  1. Normal trading (sales roll or tickets trickle in, gift shop sells)
  *  2. At 7 PM, tonight's event
- *  3. At midnight: bills (weekly), artist drift, market refresh, day report.
+ *  3. At midnight: bills (weekly), artist drift, gift shop restock, market refresh, day report.
  *     Nobody is sent home: visits carry on past midnight.
  */
 export function stepHour(state: GameState, rng: Rng): void {
@@ -39,6 +40,7 @@ export function stepHour(state: GameState, rng: Rng): void {
   const arrivals = venue.hour(state, rng);
   state.today.visitors += arrivals;
   hourOfGuests(state, rng, arrivals);
+  shopSales(state, rng, arrivals);
 
   if (state.tick === TIME.eventTick) {
     const tonight = state.events.filter((e) => e.day === state.day);
@@ -67,6 +69,7 @@ function endOfDay(state: GameState, rng: Rng): void {
   }
 
   endOfDayArtists(state);
+  shopEndOfDay(state);
   state.buzz *= GUESTS.buzzDecay;
 
   state.history.push(state.today);
