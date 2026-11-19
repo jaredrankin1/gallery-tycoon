@@ -314,6 +314,20 @@ export interface Guest {
   favoriteArtworkId?: Id;
 }
 
+/**
+ * How a visitor feels right now. Each axis runs -1 .. 1 between two poles:
+ * sad/happy, bored/amused, blasé/inspired, baffled/enlightened (do they "get"
+ * the work?) and browsing/covetous (do they want to own something?).
+ */
+export interface Mood {
+  happy: number;
+  amused: number;
+  inspired: number;
+  enlightened: number;
+  covetous: number;
+}
+export type MoodAxis = keyof Mood;
+
 /** One planned stop on a visit. Positions are tile coordinates (floats are tile centres). */
 export interface VisitStep {
   artworkId: Id;
@@ -324,6 +338,10 @@ export interface VisitStep {
   score: number;
   reaction: Reaction;
   action?: 'photo' | 'notes';
+  /** How this work changes their mood, applied once they've reacted to it. */
+  mood?: Mood;
+  /** Other people already looking at this work when they got there. */
+  crowd?: number;
 }
 
 export interface GuestVisit {
@@ -339,6 +357,12 @@ export interface GuestVisit {
   event?: boolean;
   /** Set for an ordinary member of the public (not one of the named guests): which sprite, and which recolour. */
   look?: { sprite: string; variant: number };
+  /** A member of the public's name (named guests use Guest.name). */
+  name?: string;
+  /** How they felt walking in. Steps add to it as they go (see moodAt). */
+  mood?: Mood;
+  /** They cut the visit short, and why. */
+  leftEarly?: 'bored' | 'crowded' | 'unhappy';
 }
 
 // ---- Staff: Marisol hangs new arrivals when auto-hang is on ----------------

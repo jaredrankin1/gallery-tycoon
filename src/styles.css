@@ -430,3 +430,6 @@ q.said::after { content: '”'; }
 .toggle-row input { width: 5cqw; height: 5cqw; accent-color: var(--accent); margin-top: 0.4cqw; }
 .toggle-row b, .toggle-row small { display: block; }
 .shop-link { width: 100%; text-align: left; color: inherit; font: inherit; }
+.moods { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.4cqw 2.4cqw; font-size: 0.74em; color: var(--muted); }
+.moods > span:nth-child(3n + 1) { text-align: right; }
+.moods > span.on { color: var(--text); font-weight: 600; }

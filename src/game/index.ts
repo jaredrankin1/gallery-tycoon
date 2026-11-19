@@ -12,6 +12,8 @@ export { collectionAppeal, priceDemand } from './venues/museum';
 export { getVenueModel } from './venues';
 export { canPlace, fixtureAt, displayFixtures, fitsOn } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
+export { moodAt, finalMood, moodWord, MOOD_AXES, MOOD_POLES } from './systems/moods';
+export { Steering, type Walker } from './systems/steering';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
 export { buildReserve, planPlacement, shownOnFixture } from './systems/autohang';
 export { MERCH_KINDS, buyChance, merchAppeal, merchPriceDemand, shopCounter, takingsPerVisitor } from './systems/shop';

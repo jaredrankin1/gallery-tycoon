@@ -65,14 +65,14 @@ describe('auto-hang', () => {
   });
 
   it('builds a new wall spot when the walls are full and there is money for it', () => {
-    let s = game();
+    // A museum, so visitors don't buy the test pieces off the walls.
+    let s = game(true, 'museum');
     const n = walls(s).length;
     for (let i = 0; i < n; i++) s = arrive(s, `w-${i}`, 1000 + i);
     expect(walls(s).every((f) => f.artworkId)).toBe(true);
-    const cash = s.cash;
     s = arrive(s, 'w-new', 500);
     expect(walls(s)).toHaveLength(n + 1);
-    expect(s.cash).toBe(cash - FIXTURE.wallHang.cost);
+    expect(s.ledger.filter((e) => e.category === 'fit-out').map((e) => e.amount)).toEqual([-FIXTURE.wallHang.cost]);
     expect(fixtureOf(s, 'w-new')!.kind).toBe('wallHang');
     const job = s.staff!.jobs.at(-1)!;
     expect(job.built).toBe(true);
@@ -100,7 +100,7 @@ describe('auto-hang', () => {
   });
 
   it('puts sculpture on a pedestal, building one if needed, and never swaps it for a painting', () => {
-    let s = game();
+    let s = game(true, 'museum');
     s = arrive(s, 's-1', 3000, 'sculpture'); // the starter pedestal
     expect(fixtureOf(s, 's-1')!.kind).toBe('pedestal');
     s = arrive(s, 's-2', 3000, 'sculpture');

@@ -1,11 +1,14 @@
 import { addFame } from './careers';
-import { CAREER, FIXTURE, GUESTS, TIME, trafficShare } from '../config';
+import { CAREER, FIXTURE, GUESTS, MOODS, TIME, trafficShare } from '../config';
 import { clamp, type Rng } from '../rng';
 import { GUEST_SEEDS } from '../../data/guests';
-import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, ScheduledEvent, VisitStep } from '../types';
+import { FIRST_NAMES, LAST_NAMES } from '../../data/names';
+import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, Mood, ScheduledEvent, VisitStep } from '../types';
 import { sellArtwork } from '../venues/gallery';
 import { notify } from './feed';
 import { post } from './ledger';
+import { addMood, challengeOf, encounterMood, finalMood, guestPersona, randomPersona, startMood, ZERO_MOOD, type Persona } from './moods';
+import { blockedTiles, browseSpot, route } from './paths';
 import { hash01, moodOf, reactionFor, tasteScore, workTags } from './taste';
 
 /** Absolute game hour: hours since day 1 opened. */
@@ -40,6 +43,11 @@ export function standSpot(f: Fixture, floor: FloorPlan, jitterKey: string, sprea
 }
 
 const door = (floor: FloorPlan) => ({ x: floor.entrance.x + 0.5, y: floor.entrance.y + 0.5 });
+/** Somewhere in the doorway: people don't all squeeze through the same point. */
+const doorway = (floor: FloorPlan, key: string) => ({
+  x: floor.entrance.x + 0.5 + (hash01(key + 'dx') - 0.5) * 0.6,
+  y: floor.entrance.y + 0.5 + (hash01(key + 'dy') - 0.5) * 0.6,
+});
 
 // ---------------------------------------------------------------------------
 // Timeline: the choreography of a visit, shared by the simulation (to know
@@ -75,15 +83,25 @@ const partyEndFor = (start: number) => Math.floor(start / TIME.ticksPerDay) * TI
 
 function planTimeline(v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatWith' | 'event'>, floor: FloorPlan, eventEnd?: number): Segment[] {
   const segs: Segment[] = [];
+  const key = v.guestId + '@' + v.start;
+  const blocked = blockedTiles(floor);
+  // Everyone walks at their own pace.
+  const [slow, fast] = MOODS.paceRange;
+  const speed = GUESTS.walkTilesPerHour * (slow + (fast - slow) * hash01(key + 'pace'));
   let t = v.start;
-  let pos = door(floor);
-  const walk = (to: { x: number; y: number }) => {
+  let pos = doorway(floor, key + 'in');
+  let legs = 0;
+  const leg = (to: { x: number; y: number }) => {
     const d = Math.hypot(to.x - pos.x, to.y - pos.y);
     if (d < 0.01) return;
-    const dur = d / GUESTS.walkTilesPerHour;
+    const dur = d / speed;
     segs.push({ anim: 'walk', start: t, end: t + dur, from: pos, to, faceLeft: leftward(pos, to) });
     t += dur;
     pos = to;
+  };
+  // Around the furniture, not through it.
+  const walk = (to: { x: number; y: number }) => {
+    for (const p of route(floor, pos, to, key + legs++, blocked)) leg(p);
   };
   const hold = (anim: GuestAnim, dur: number, faceLeft: boolean, step?: number) => {
     segs.push({ anim, start: t, end: t + dur, from: pos, to: pos, faceLeft, step });
@@ -97,6 +115,15 @@ function planTimeline(v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatW
     hold('disapprove', GUESTS.reactHours, true);
   }
   v.steps.forEach((s, i) => {
+    // Some people drift into the middle of the room for a bit before the next work.
+    if (!v.event && hash01(key + 'browse' + i) < MOODS.browseChance) {
+      const spot = browseSpot(floor, key + i, blocked);
+      if (spot) {
+        walk(spot);
+        const [lo, hi] = MOODS.browseHours;
+        hold('idle', lo + (hi - lo) * hash01(key + 'linger' + i), hash01(key + 'turn' + i) < 0.5);
+      }
+    }
     walk(s.at);
     hold('look', GUESTS.lookHours, s.faceLeft, i);
     hold(s.reaction, GUESTS.reactHours, s.faceLeft, i);
@@ -120,7 +147,7 @@ function planTimeline(v: Pick<GuestVisit, 'guestId' | 'start' | 'steps' | 'chatW
   } else if (v.chatWith) {
     hold('chat', GUESTS.chatHours, false);
   }
-  walk(door(floor));
+  walk(doorway(floor, key + 'out'));
   return segs;
 }
 
@@ -141,36 +168,134 @@ export function poseAt(segs: Segment[], now: number) {
 // ---------------------------------------------------------------------------
 // Planning a visit
 
-function planSteps(state: GameState, guest: Pick<Guest, 'id' | 'likes' | 'dislikes' | 'traits'>, rng: Rng, max: number, spread = 0): VisitStep[] {
+/**
+ * Who is where, and when, among the visits already planned: used to work out
+ * how crowded a work will be when someone gets to it.
+ */
+export interface Occupancy {
+  /** Per artwork: when people stand at it. */
+  at: Map<string, [number, number][]>;
+  /** When each visit is in the building. */
+  inside: [number, number][];
+  area: number;
+}
+
+export function occupancyOf(state: GameState): Occupancy {
+  const occ: Occupancy = { at: new Map(), inside: [], area: state.floor.width * state.floor.height };
+  for (const v of state.visits) addOccupancy(occ, v, visitTimeline(v, state.floor));
+  return occ;
+}
+
+function addOccupancy(occ: Occupancy, v: GuestVisit, segs: Segment[]) {
+  occ.inside.push([v.start, v.end]);
+  v.steps.forEach((s, i) => {
+    const mine = segs.filter((g) => g.step === i);
+    if (!mine.length) return;
+    const list = occ.at.get(s.artworkId) ?? [];
+    list.push([mine[0].start, mine[mine.length - 1].end]);
+    occ.at.set(s.artworkId, list);
+  });
+}
+
+const during = (list: [number, number][] | undefined, t: number) => (list ?? []).filter(([a, b]) => a <= t && t < b).length;
+
+interface Plan {
+  steps: VisitStep[];
+  leftEarly?: GuestVisit['leftEarly'];
+}
+
+function planSteps(
+  state: GameState,
+  guest: Pick<Guest, 'id' | 'likes' | 'dislikes' | 'traits'>,
+  rng: Rng,
+  max: number,
+  spread = 0,
+  moods?: { persona: Persona; start: Mood; at: number; occ: Occupancy },
+): Plan {
   const spots = state.floor.fixtures.filter((f) => FIXTURE[f.kind].display && f.artworkId);
   // Shuffle, then keep the first few: people wander, they don't follow a list.
   for (let i = spots.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1));
     [spots[i], spots[j]] = [spots[j], spots[i]];
   }
-  return spots.slice(0, max).map((f, i) => {
+  const steps: VisitStep[] = [];
+  let mood = moods?.start ?? ZERO_MOOD;
+  let lastArtist: string | undefined;
+  let leftEarly: Plan['leftEarly'];
+  // Rough arrival time at each work, for judging the crowd there.
+  let t = (moods?.at ?? 0) + 0.25;
+  for (let n = 0; n < spots.length && steps.length < max; n++) {
+    const f = spots[n];
     const work = state.artworks[f.artworkId!];
-    const score = tasteScore(guest as Guest, work, state.artists[work.artistId]);
+    const artist = state.artists[work.artistId];
+    const score = tasteScore(guest as Guest, work, artist);
     const reaction = reactionFor(score);
     const { at, faceLeft } = standSpot(f, state.floor, guest.id + f.id, spread);
     let action: VisitStep['action'];
+    const i = steps.length;
     const notes = guest.traits.includes('note-taker');
     const photos = guest.traits.includes('photographer') && score >= 0.55;
     // People who do both alternate: sketch one, photograph the next.
     if (notes && (!photos || i % 2 === 0)) action = 'notes';
     else if (photos) action = 'photo';
-    return { artworkId: work.id, at, faceLeft, score, reaction, action };
-  });
+    const step: VisitStep = { artworkId: work.id, at, faceLeft, score, reaction, action };
+
+    if (moods) {
+      const crowd = during(moods.occ.at.get(work.id), t);
+      const left = spots.length - n - 1;
+      // Impatient people skip a work with a crowd round it, if there's something else to see.
+      if (crowd >= MOODS.skipCrowdAt && moods.persona.patience < 0.5 && left > 0) {
+        mood = addMood(mood, { ...ZERO_MOOD, happy: -0.04 });
+        continue;
+      }
+      const packed = during(moods.occ.inside, t) / moods.occ.area / MOODS.packedDensity - 1;
+      const delta = encounterMood(moods.persona, {
+        score,
+        challenge: challengeOf(work, artist),
+        fame: artist?.fame ?? 0,
+        tags: workTags(work, artist),
+        repeat: work.artistId === lastArtist,
+        crowd,
+        packed,
+        venue: state.venue,
+        affordable: state.venue === 'gallery' ? clamp((moods.persona.wealth * 40_000) / Math.max(1, work.price), 0, 1) : 0,
+      });
+      step.mood = delta;
+      step.crowd = crowd;
+      mood = addMood(mood, delta);
+      t += GUESTS.lookHours + GUESTS.reactHours + (action ? GUESTS.actionHours : 0) + 0.35;
+    }
+    steps.push(step);
+    lastArtist = work.artistId;
+
+    // Had enough? Leave before the rest of the plan.
+    if (moods && steps.length < max && n < spots.length - 1) {
+      if (mood.amused <= MOODS.leaveBoredAt) leftEarly = 'bored';
+      else if (mood.happy <= MOODS.leaveUnhappyAt) leftEarly = (step.crowd ?? 0) > 1 ? 'crowded' : 'unhappy';
+      if (leftEarly) break;
+    }
+  }
+  return { steps, leftEarly };
 }
 
-function makeVisit(state: GameState, guest: Guest, start: number, rng: Rng): GuestVisit {
+/** "Ada Okafor": a name for someone off the street. */
+export function randomName(rng: Rng): string {
+  return `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
+}
+
+function makeVisit(state: GameState, guest: Guest, start: number, rng: Rng, occ: Occupancy): GuestVisit {
   const max = guest.role === 'critic' ? GUESTS.worksPerVisit + 1 : GUESTS.worksPerVisit;
-  const steps = planSteps(state, guest, rng, max);
+  const persona = guestPersona(guest);
+  const mood = startMood(persona, rng);
+  // How they feel about the place colours the day.
+  mood.happy = clamp(mood.happy + guest.affinity / 250, -1, 1);
+  const { steps, leftEarly } = planSteps(state, guest, rng, max, 0, { persona, start: mood, at: start, occ });
   const others = state.visits.filter((v) => !v.event && v.guestId !== guest.id);
   const chatWith = guest.traits.includes('chatty') && others.length ? others[Math.floor(rng.next() * others.length)].guestId : undefined;
-  const v: GuestVisit = { guestId: guest.id, start, end: 0, steps, chatWith };
+  const v: GuestVisit = { guestId: guest.id, start, end: 0, steps, chatWith, mood, leftEarly };
   const segs = visitTimeline(v, state.floor);
   v.end = segs[segs.length - 1].end;
+  addOccupancy(occ, v, segs);
   return v;
 }
 
@@ -197,27 +322,32 @@ const CROWD_SPRITES = GUEST_SEEDS.map((g) => g.sprite).filter((s) => !UNIQUE_LOO
 export const CROWD_VARIANTS = 5;
 const CROWD_TAGS = ['painting', 'portrait', 'landscape', 'colorful', 'pop', 'classic', 'quiet', 'moody', 'fantasy', 'weird', 'retro', 'digital', 'sculpture', 'figurative'];
 
-/** One ordinary visitor: a stranger with a couple of passing tastes. */
-function crowdVisit(state: GameState, start: number, rng: Rng, event = false): GuestVisit {
+/** One ordinary visitor: a stranger with a name, a couple of passing tastes and a mood of their own. */
+function crowdVisit(state: GameState, start: number, rng: Rng, occ: Occupancy, event = false): GuestVisit {
   const id = `c${state.nextId++}`;
   const look = { sprite: rng.pick(CROWD_SPRITES), variant: 1 + Math.floor(rng.next() * (CROWD_VARIANTS - 1)) };
+  const name = randomName(rng);
   const stranger = {
     id,
     likes: [rng.pick(CROWD_TAGS), rng.pick(CROWD_TAGS)],
     dislikes: [rng.pick(CROWD_TAGS)],
     traits: rng.chance(0.15) ? ['photographer'] : [],
   };
-  const steps = planSteps(state, stranger, rng, event ? (rng.chance(0.5) ? 1 : 0) : 1 + Math.floor(rng.next() * 3), 1.6);
-  const v: GuestVisit = { guestId: id, start, end: 0, steps, look, event: event || undefined };
+  const persona = randomPersona(rng);
+  const mood = startMood(persona, rng, event);
+  const max = event ? (rng.chance(0.5) ? 1 : 0) : 1 + Math.floor(rng.next() * 3);
+  const { steps, leftEarly } = planSteps(state, stranger, rng, max, 1.6, { persona, start: mood, at: start, occ });
+  const v: GuestVisit = { guestId: id, start, end: 0, steps, look, name, mood, leftEarly, event: event || undefined };
   const segs = visitTimeline(v, state.floor);
   v.end = segs[segs.length - 1].end;
+  addOccupancy(occ, v, segs);
   return v;
 }
 
 /** Puts `n` members of the public on the floor, arriving across the coming hour. */
-export function crowdArrives(state: GameState, n: number, rng: Rng, event = false): void {
+export function crowdArrives(state: GameState, n: number, rng: Rng, event = false, occ = occupancyOf(state)): void {
   const now = shownHour(state);
-  for (let i = 0; i < n; i++) state.visits.push(crowdVisit(state, now + rng.next() * (event ? 0.6 : 0.95), rng, event));
+  for (let i = 0; i < n; i++) state.visits.push(crowdVisit(state, now + rng.next() * (event ? 0.6 : 0.95), rng, occ, event));
 }
 
 export function hourOfGuests(state: GameState, rng: Rng, publicArrivals = 0): void {
@@ -226,12 +356,13 @@ export function hourOfGuests(state: GameState, rng: Rng, publicArrivals = 0): vo
   for (const v of state.visits.filter((v) => v.end <= now)) resolveVisit(state, v, rng);
   state.visits = state.visits.filter((v) => v.end > now);
 
-  crowdArrives(state, publicArrivals, rng);
+  const occ = occupancyOf(state);
+  crowdArrives(state, publicArrivals, rng, false, occ);
   for (const g of Object.values(state.guests)) {
     if (state.visits.some((v) => v.guestId === g.id)) continue;
     if (!rng.chance(arrivalChance(state, g))) continue;
     g.lastVisitDay = state.day;
-    state.visits.push(makeVisit(state, g, now + rng.next() * 0.8, rng));
+    state.visits.push(makeVisit(state, g, now + rng.next() * 0.8, rng, occ));
     // Named guests are visitors too: they count, and in a museum they buy a ticket.
     state.today.visitors += 1;
     if (state.venue === 'museum' && state.settings.ticketPrice > 0) post(state, 'tickets', state.settings.ticketPrice, 'Ticket sales', true);
@@ -257,9 +388,30 @@ function learn(state: GameState, g: Guest, steps: VisitStep[]) {
 
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
+/**
+ * A member of the public on their way out. Delighted people tell their
+ * friends; miserable ones tell everyone. In a gallery, someone who fell for a
+ * work may come back to the desk and buy it.
+ */
+function resolvePublic(state: GameState, v: GuestVisit, rng: Rng): void {
+  if (!v.mood) return; // planned before moods existed (old save)
+  const m = finalMood(v);
+  const glow = (m.happy + m.inspired + m.amused) / 3;
+  if (glow > 0.35) state.buzz += MOODS.wordOfMouth;
+  else if (glow < -0.3) state.buzz = Math.max(0, state.buzz - MOODS.wordOfMouth);
+
+  if (state.venue !== 'gallery' || v.event || m.covetous < MOODS.buyAt) return;
+  // The work they wanted most: the one that pushed covetousness up furthest.
+  const wanted = [...v.steps].sort((a, b) => (b.mood?.covetous ?? 0) - (a.mood?.covetous ?? 0))[0];
+  const work = wanted && state.artworks[wanted.artworkId];
+  if (!work || work.status !== 'display' || work.price > work.value * 1.6) return;
+  if (rng.chance(MOODS.buyChance + (m.covetous - MOODS.buyAt))) sellArtwork(state, work, `to ${v.name ?? 'a visitor'}`);
+}
+
 export function resolveVisit(state: GameState, v: GuestVisit, rng: Rng): void {
   const g = state.guests[v.guestId];
-  if (!g || v.event) return;
+  if (!g) return resolvePublic(state, v, rng);
+  if (v.event) return;
   const name = shortName(g);
   const seen = v.steps.filter((s) => state.artworks[s.artworkId]);
   const avg = seen.length ? seen.reduce((a, s) => a + s.score, 0) / seen.length : 0.2;
@@ -325,6 +477,7 @@ export function resolveVisit(state: GameState, v: GuestVisit, rng: Rng): void {
 export function eventGuests(state: GameState, event: ScheduledEvent, satisfaction: number, rng: Rng, attendance = 0): void {
   let named = 0;
   const now = shownHour(state);
+  const occ = occupancyOf(state);
   const { wine, cheese } = event.hospitality;
   const reactions: string[] = [];
   for (const g of Object.values(state.guests)) {
@@ -352,20 +505,25 @@ export function eventGuests(state: GameState, event: ScheduledEvent, satisfactio
     g.lastVisitDay = state.day;
     if (state.visits.some((v) => v.guestId === g.id)) continue;
 
-    const steps = planSteps(state, g, rng, 1);
+    const persona = guestPersona(g);
+    const start = now + rng.next() * 0.5;
+    const moodIn = startMood(persona, rng, true);
+    moodIn.happy = clamp(moodIn.happy + mood / 40, -1, 1);
+    const { steps } = planSteps(state, g, rng, 1, 0, { persona, start: moodIn, at: start, occ });
     // Buyers are in a spending mood at a good party.
     const best = steps[0];
     if (g.traits.includes('buyer') && best && state.venue === 'gallery' && best.score + satisfaction * 0.15 >= GUESTS.impressedAt) {
       const work = state.artworks[best.artworkId];
       if (work.status === 'display' && work.price <= g.budget && work.price <= work.value * g.priceTolerance) sellArtwork(state, work, `to ${name} at the ${event.kind}`, g.id);
     }
-    const v: GuestVisit = { guestId: g.id, start: now + rng.next() * 0.5, end: 0, steps, event: true };
+    const v: GuestVisit = { guestId: g.id, start, end: 0, steps, event: true, mood: moodIn };
     const segs = visitTimeline(v, state.floor);
     v.end = segs[segs.length - 1].end;
+    addOccupancy(occ, v, segs);
     state.visits.push(v);
     named++;
   }
-  crowdArrives(state, Math.max(0, attendance - named), rng, true);
+  crowdArrives(state, Math.max(0, attendance - named), rng, true, occ);
   for (const r of reactions.slice(0, 3)) notify(state, { kind: 'guest', text: r });
 }
 
