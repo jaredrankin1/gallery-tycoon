@@ -95,6 +95,8 @@ small { font-size: 0.8em; line-height: 1.35; }
 .chips-mini { display: flex; gap: 1.4cqw; }
 .mini { display: inline-flex; align-items: center; gap: 1cqw; font-size: 0.85em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .mini .icon { color: var(--accent); }
+.sound-btn { background: none; border: 0; padding: 1cqw; margin: -1cqw 0; cursor: pointer; }
+.sound-btn[aria-pressed='false'] .icon { color: var(--muted); }
 .speed { display: flex; background: var(--glass); border: 1px solid var(--line); border-radius: 99px; padding: 0.6cqw; }
 .speed button { background: none; border: 0; width: 8cqw; height: 7cqw; border-radius: 99px; color: var(--muted); display: grid; place-items: center; }
 .speed button.on { background: var(--accent); color: var(--accent-ink); }

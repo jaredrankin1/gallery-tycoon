@@ -41,6 +41,13 @@ goes dark.
 - **Events**: book an opening, reception, talk or gala on a future night. Choose featured artists, wine and cheese tiers, and how many guests to cater for. Events happen at 7 PM, with a crowd holding glasses on the floor.
 - **Books**: the last 14 days of income and spending, weekly art and wine & cheese budgets, the ticket price (museum), and the ledger.
 
+**Sound.** Crowd chatter rises and falls with how many people are on the floor
+(a couple of voices when it's quiet, a full room on a busy afternoon, near
+silence overnight), with a short gallery reverb. Named visitors ring the door
+bell, sales ring the till, cameras click, glasses clink at parties, and buttons
+tap. It's all synthesized in the browser (`src/audio/`), so there are no sound
+files. The speaker button in the top bar mutes it, and the choice is remembered.
+
 Sales, ticket money, events and artist reactions show up as toasts as they
 happen, and sales pop floating "+$" labels over the painting. Rent and staff
 are paid every Sunday night. If cash drops below the overdraft limit, the

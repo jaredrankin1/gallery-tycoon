@@ -57,6 +57,20 @@ const paths: Record<string, JSX.Element> = {
       <path d="M16 6l6 6-6 6z" />
     </>
   ),
+  sound: (
+    <>
+      <path d="M4 9h4l5-4v14l-5-4H4z" />
+      <path d="M16.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M19 6a8.5 8.5 0 0 1 0 12" />
+    </>
+  ),
+  mute: (
+    <>
+      <path d="M4 9h4l5-4v14l-5-4H4z" />
+      <path d="M17 9.5l5 5" />
+      <path d="M22 9.5l-5 5" />
+    </>
+  ),
   close: (
     <>
       <path d="M6 6l12 12" />

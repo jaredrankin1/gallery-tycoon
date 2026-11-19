@@ -14,6 +14,7 @@ import { BooksSheet } from './sheets/Books';
 import { CollectionSheet } from './sheets/Collection';
 import { EventsSheet } from './sheets/Events';
 import { useStore, type Store } from './store';
+import { sound } from '../audio/sound';
 
 interface Toast {
   id: number;
@@ -49,7 +50,10 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
   const act = useCallback(
     (a: Action) => {
       const r = store.act(a);
-      if (!r.ok) toast(r.error, 'error');
+      if (!r.ok) {
+        toast(r.error, 'error');
+        sound.play('error');
+      }
       return r.ok;
     },
     [store, toast],
@@ -86,8 +90,17 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
     });
     r.setClock(() => absHour(store.state) + store.hourProgress);
     r.setOnCount(setInside);
+    r.setOnSfx((k) => sound.play(k));
     rendererRef.current = r;
-    return () => r.destroy();
+    // The room's murmur follows the crowd on screen.
+    const amb = setInterval(() => {
+      const a = r.ambience();
+      sound.setAmbience(a.count, a.party, store.speedIndex === 0);
+    }, 250);
+    return () => {
+      clearInterval(amb);
+      r.destroy();
+    };
   }, []);
 
   useEffect(() => {
@@ -110,7 +123,13 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
     const fresh = state.feed.filter((f) => f.id > seenFeed.current);
     seenFeed.current = state.feedSeq;
     for (const f of fresh) {
-      if (f.at && f.amount) rendererRef.current?.pop(f.at.x, f.at.y, `+${shortMoney(f.amount)}`);
+      if (f.at && f.amount) {
+        rendererRef.current?.pop(f.at.x, f.at.y, `+${shortMoney(f.amount)}`);
+        sound.play('sale');
+      } else if (f.kind === 'tickets') sound.play('coin');
+      else if (f.kind === 'event') sound.play('event');
+      else if (f.kind === 'warn' || f.kind === 'bills') sound.play('warn');
+      else if (f.kind === 'review' || f.kind === 'guest') sound.play('note');
       const face = f.guestId ? state.guests[f.guestId]?.sprite : undefined;
       const tone: Toast['tone'] =
         f.kind === 'sale' || f.kind === 'tickets' ? 'sale' : f.kind === 'event' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
@@ -195,6 +214,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
                 <Icon name="people" size={14} />
                 {inside}
               </span>
+              <SoundToggle />
             </div>
             <div class="speed" role="group" aria-label="Game speed">
               {TIME.speeds.map((sp, i) => (
@@ -285,5 +305,15 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
         )}
       </div>
     </Ctx.Provider>
+  );
+}
+
+function SoundToggle() {
+  const [on, setOn] = useState(sound.enabled);
+  useEffect(() => sound.subscribe(() => setOn(sound.enabled)), []);
+  return (
+    <button class="mini sound-btn" onClick={() => sound.setEnabled(!on)} aria-label={on ? 'Sound on: tap to mute' : 'Sound off: tap to unmute'} aria-pressed={on} title={on ? 'Mute' : 'Unmute'}>
+      <Icon name={on ? 'sound' : 'mute'} size={16} />
+    </button>
   );
 }

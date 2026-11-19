@@ -62,6 +62,9 @@ export class IsoRenderer {
   /** Tells the HUD how many people are on the floor right now. */
   private onCount: (n: number) => void = () => {};
   private lastCount = -1;
+  private onSfx: (kind: 'door' | 'shutter') => void = () => {};
+  /** Visits and photo flashes already heard, so each makes its sound once. */
+  private heard = new Set<string>();
   private guestCount = 0;
   /** Real-time ms until which the assistant is cheering. */
   private cheerUntil = 0;
@@ -130,6 +133,23 @@ export class IsoRenderer {
 
   setOnCount(fn: (n: number) => void) {
     this.onCount = fn;
+  }
+
+  /** Sounds tied to what's on screen: a named guest coming in, a camera flash. */
+  setOnSfx(fn: (kind: 'door' | 'shutter') => void) {
+    this.onSfx = fn;
+  }
+
+  /** How many people are on the floor, and whether a party is on, for the sound. */
+  ambience() {
+    return { count: Math.max(0, this.lastCount), party: this.partyNow() };
+  }
+
+  private once(key: string) {
+    if (this.heard.has(key)) return false;
+    if (this.heard.size > 600) this.heard.clear();
+    this.heard.add(key);
+    return true;
   }
 
   /** Where the game clock is right now, in absolute hours (see absHour). */
@@ -294,6 +314,8 @@ export class IsoRenderer {
     for (const v of s.visits) {
       if (now < v.start || now >= v.end) continue;
       this.guestCount++;
+      // The door bell rings for the regulars and named characters, not every stranger.
+      if (!v.look && !v.event && now - v.start < 0.3 && this.once(`in:${v.guestId}@${v.start}`)) this.onSfx('door');
       const pose = poseAt(this.timeline(v), now);
       if (pose) items.push({ depth: pose.x + pose.y, draw: () => this.drawGuest(v, pose, t) });
     }
@@ -615,6 +637,7 @@ export class IsoRenderer {
       ctx.textBaseline = 'alphabetic';
     }
     if (seg.anim === 'photo' && frame === 2) {
+      if (this.once(`ph:${v.guestId}@${v.start}@${seg.start}`)) this.onSfx('shutter');
       ctx.fillStyle = 'rgba(255,255,240,0.5)';
       ctx.beginPath();
       ctx.arc(p.x + (seg.faceLeft ? -8 : 8), p.y - ch * scale * 0.8, 10, 0, Math.PI * 2);

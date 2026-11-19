@@ -1,3 +1,4 @@
+import { sound } from './audio/sound';
 import { render } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { createNewGame, saveGame } from './game';
@@ -38,4 +39,5 @@ function App() {
   );
 }
 
+sound.install();
 render(<App />, document.getElementById('app')!);
