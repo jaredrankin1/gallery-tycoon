@@ -13,7 +13,9 @@ const hung = (venue: 'gallery' | 'museum', seed: number) => {
   let s = createNewGame({ name: 'x', difficulty: 'easy', venue, seed });
   for (const w of offers(s).slice(0, 4)) {
     s = run(s, { type: 'buyArtwork', artworkId: w.id });
-    s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    // Anything that won't go up where there's room (a sculpture with no free pedestal) stays in storage.
+    const r = dispatch(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    if (r.ok) s = r.state;
   }
   return s;
 };
