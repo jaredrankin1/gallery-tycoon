@@ -13,7 +13,7 @@ const game = (autoHang = true) => createNewGame({ name: 'x', difficulty: 'normal
 function arrive(s: GameState, id: string, value: number, form?: Artwork['form'], hours = 6): GameState {
   const next = structuredClone(s);
   const artistId = Object.keys(next.artists)[0];
-  next.artworks[id] = { id, title: id, artistId, value, acquiredFor: 0, price: value, status: 'storage', day: next.day, ...(form ? { form } : {}) };
+  next.artworks[id] = { id, title: id, artistId, value, acquiredFor: 0, price: value, status: 'storage', day: next.day, ...(form ? { form } : {}) } as Artwork;
   return run(next, { type: 'tick', hours });
 }
 
@@ -21,7 +21,7 @@ function arrive(s: GameState, id: string, value: number, form?: Artwork['form'],
 function offer(s: GameState, id: string, value: number, form?: Artwork['form']): GameState {
   const next = structuredClone(s);
   const artistId = Object.keys(next.artists)[0];
-  next.artworks[id] = { id, title: id, artistId, value, acquiredFor: 0, price: value, status: 'offered', day: next.day + 3, ...(form ? { form } : {}) };
+  next.artworks[id] = { id, title: id, artistId, value, acquiredFor: 0, price: value, status: 'offered', day: next.day + 3, ...(form ? { form } : {}) } as Artwork;
   return next;
 }
 
