@@ -11,6 +11,7 @@ import { GuestCard } from './GuestCard';
 import { Onboarding } from './Onboarding';
 import { portraitUrl } from '../render/sprites';
 import { BooksSheet } from './sheets/Books';
+import { ShopSheet } from './sheets/Shop';
 import { CollectionSheet } from './sheets/Collection';
 import { EventsSheet } from './sheets/Events';
 import { useStore, type Store } from './store';
@@ -115,6 +116,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
 
   // ---- feed -> toasts + floating labels ----
   const seenFeed = useRef(state.feedSeq);
+  const lastChime = useRef(0);
   useEffect(() => {
     if (onboarding) {
       seenFeed.current = state.feedSeq;
@@ -123,16 +125,26 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
     const fresh = state.feed.filter((f) => f.id > seenFeed.current);
     seenFeed.current = state.feedSeq;
     for (const f of fresh) {
+      // The gift shop's hourly trickle: a coin over the counter, no toast.
+      if (f.quiet) {
+        if (f.at && f.amount) rendererRef.current?.pop(f.at.x, f.at.y, `+${shortMoney(f.amount)}`);
+        // At most one till chime every few seconds, so a busy museum doesn't jingle nonstop.
+        if (performance.now() - lastChime.current > 5000) {
+          lastChime.current = performance.now();
+          sound.play('coin');
+        }
+        continue;
+      }
       if (f.at && f.amount) {
         rendererRef.current?.pop(f.at.x, f.at.y, `+${shortMoney(f.amount)}`);
         sound.play('sale');
-      } else if (f.kind === 'tickets') sound.play('coin');
+      } else if (f.kind === 'tickets' || f.kind === 'shop') sound.play('coin');
       else if (f.kind === 'event') sound.play('event');
       else if (f.kind === 'warn' || f.kind === 'bills') sound.play('warn');
       else if (f.kind === 'review' || f.kind === 'guest' || f.kind === 'delivery') sound.play('note');
       const face = f.guestId ? state.guests[f.guestId]?.sprite : undefined;
       const tone: Toast['tone'] =
-        f.kind === 'sale' || f.kind === 'tickets' ? 'sale' : f.kind === 'event' || f.kind === 'delivery' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
+        f.kind === 'sale' || f.kind === 'tickets' || f.kind === 'shop' ? 'sale' : f.kind === 'event' || f.kind === 'delivery' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
       toast(f.text, tone, face);
     }
   }, [state.feedSeq, onboarding]);
@@ -266,10 +278,11 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
         {ui.sheet === 'people' && <PeopleSheet />}
         {ui.sheet === 'events' && <EventsSheet />}
         {ui.sheet === 'books' && <BooksSheet />}
+        {ui.sheet === 'shop' && <ShopSheet />}
 
         <nav class="dock">
           {DOCK.map((d) => {
-            const on = d.id === 'build' ? ui.building : ui.sheet === d.id;
+            const on = d.id === 'build' ? ui.building : ui.sheet === d.id || (d.id === 'books' && ui.sheet === 'shop');
             const badge = d.id === 'events' ? state.events.length + (state.exhibition ? 1 : 0) : d.id === 'collection' ? Object.values(state.artworks).filter((w) => w.status === 'storage').length : 0;
             return (
               <button class={`${on ? 'on' : ''} ${ui.coach && d.id === 'collection' ? 'pulse' : ''}`} onClick={() => openDock(d.id)}>

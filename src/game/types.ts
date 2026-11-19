@@ -174,7 +174,8 @@ export type LedgerCategory =
   | 'fit-out'
   | 'sales'
   | 'tickets'
-  | 'donations';
+  | 'donations'
+  | 'shop';
 
 export interface LedgerEntry {
   day: number;
@@ -193,7 +194,7 @@ export interface DayReport {
   sales: number;
 }
 
-export type FeedKind = 'staff' | 'sale' | 'tickets' | 'event' | 'artist' | 'delivery' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
+export type FeedKind = 'staff' | 'sale' | 'tickets' | 'shop' | 'event' | 'artist' | 'delivery' | 'guest' | 'review' | 'bills' | 'market' | 'warn';
 
 /** Something worth telling the player about, as it happens. The UI shows new ones as toasts. */
 export interface FeedItem {
@@ -206,6 +207,8 @@ export interface FeedItem {
   guestId?: Id;
   /** Tile to pop a floating label over, if it happened somewhere on the floor. */
   at?: { x: number; y: number };
+  /** Floating label and sound only, no toast (the gift shop's steady trickle of sales). */
+  quiet?: boolean;
 }
 
 /** Player-set spending targets per week. Purely advisory for now; the books compare against them. */
@@ -226,7 +229,7 @@ export interface VenueSettings {
 // walls sit along x = 0 (left wall) and y = 0 (right wall). The renderer only
 // reads this; game rules only ever talk in tiles, never pixels.
 
-export type FixtureKind = 'wallHang' | 'pedestal' | 'bar' | 'bench' | 'plant';
+export type FixtureKind = 'wallHang' | 'pedestal' | 'bar' | 'bench' | 'plant' | 'shop';
 
 export interface Fixture {
   id: Id;
@@ -243,6 +246,28 @@ export interface FloorPlan {
   /** Tile the public walks in through (front edge). */
   entrance: { x: number; y: number };
   fixtures: Fixture[];
+}
+
+// ---- Gift shop ---------------------------------------------------------------
+
+export type MerchKind = 'postcard' | 'print' | 'keychain' | 'tshirt';
+
+export interface MerchLine {
+  /** Units on the shelf. Sales stop at zero. */
+  stock: number;
+  /** What the player charges for one. */
+  price: number;
+  /** Units sold today and in total, for the shop panel. */
+  soldToday: number;
+  soldTotal: number;
+}
+
+export interface GiftShop {
+  lines: Record<MerchKind, MerchLine>;
+  /** Overnight, top up any line that is running low by one wholesale batch. */
+  autoRestock: boolean;
+  /** Takings today, shown on the counter and in the summary at midnight. */
+  takingsToday: number;
 }
 
 // ---- Guests: named visitors with tastes -------------------------------------
@@ -388,6 +413,8 @@ export interface GameState {
   exhibition: Exhibition | null;
   /** Past shows, newest last. */
   exhibitionHistory: ExhibitionSummary[];
+  /** Postcards, prints, keychains and t-shirts. Sells only once a shop counter is built. */
+  shop: GiftShop;
   ledger: LedgerEntry[];
   /** Running totals for the day in progress. */
   today: DayReport;

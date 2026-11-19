@@ -1,4 +1,4 @@
-import { CAREER, CHEESE_PER_GUEST, DIFFICULTY, EVENT_KIND, FIXTURE_EFFECTS, WINE_PER_GUEST } from '../config';
+import { CAREER, CHEESE_PER_GUEST, DIFFICULTY, EVENT_KIND, FIXTURE_EFFECTS, SHOP, WINE_PER_GUEST } from '../config';
 import { countFixtures } from './floor';
 import { clamp, Rng } from '../rng';
 import type { EventResult, GameState, HospitalityPlan, ScheduledEvent } from '../types';
@@ -9,6 +9,7 @@ import { exhibitionEventBoost } from './exhibitions';
 import { notify } from './feed';
 import { eventGuests } from './visits';
 import { post } from './ledger';
+import { shopSales } from './shop';
 
 export function hospitalityCost(plan: HospitalityPlan): number {
   return plan.guests * (WINE_PER_GUEST[plan.wine] + CHEESE_PER_GUEST[plan.cheese]);
@@ -81,6 +82,8 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
 
   const venue = getVenueModel(state.venue);
   const { income, soldArtworkIds } = venue.onEvent(state, event, attendance, satisfaction, rng);
+  // Happy crowds browse the gift shop on the way out.
+  shopSales(state, rng, attendance, SHOP.eventSpend * (0.5 + satisfaction));
 
   const verdict = satisfaction > 0.7 ? 'A triumph.' : satisfaction > 0.4 ? 'A pleasant evening.' : 'Guests left hungry.';
   notify(state, {

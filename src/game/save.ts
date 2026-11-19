@@ -3,6 +3,7 @@ import { CAREER } from './config';
 import { clamp, Rng } from './rng';
 import { baseWorkValue } from './systems/careers';
 import { newArtist } from './state';
+import { createShop } from './systems/shop';
 import type { GameState } from './types';
 
 const KEY = 'agt.save.v4';
@@ -58,6 +59,8 @@ export function migrate(s: any): GameState | null {
     jobs: [],
   };
   s.staff.parked ??= [];
+  // Saves from before the gift shop: start them with an empty one.
+  s.shop ??= createShop();
   return s as GameState;
 }
 

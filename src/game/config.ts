@@ -1,4 +1,4 @@
-import type { Difficulty, EventKind, FixtureKind, HospitalityTier, VenueType } from './types';
+import type { Difficulty, EventKind, FixtureKind, HospitalityTier, MerchKind, VenueType } from './types';
 
 // All tuning numbers live here so balancing never means hunting through systems.
 
@@ -172,6 +172,7 @@ export const FIXTURE: Record<FixtureKind, FixtureConfig> = {
   bar: { label: 'Wine bar', cost: 2_500, display: false, wallOnly: false },
   bench: { label: 'Bench', cost: 300, display: false, wallOnly: false },
   plant: { label: 'Plant', cost: 150, display: false, wallOnly: false },
+  shop: { label: 'Gift shop', cost: 2_500, display: false, wallOnly: false },
 };
 
 /** Marisol's auto-hang. Durations in game hours. */
@@ -190,7 +191,7 @@ export const AUTO_HANG = {
   returnHours: 0.6,
 };
 
-/** Effects of furniture. Hooks for later: lighting, guards, gift shop... */
+/** Effects of furniture. Hooks for later: lighting, guards... */
 export const FIXTURE_EFFECTS = {
   /** Each bar adds this much to event satisfaction. */
   barSatisfaction: 0.06,
@@ -338,4 +339,44 @@ export const EXHIBITION = {
   historySize: 10,
   /** Penalty for repeating a theme from one of your last two shows. */
   repeatPenalty: 0.15,
+};
+
+// ---- Gift shop ---------------------------------------------------------------
+
+export interface MerchConfig {
+  label: string;
+  /** Plural, for "Stocked 100 postcards". */
+  plural: string;
+  /** Wholesale cost per unit. */
+  unitCost: number;
+  /** The price shoppers think is fair. Charging more cuts demand fast. */
+  fairPrice: number;
+  /** Units per wholesale order. */
+  batch: number;
+  /** Chance one visitor buys one, at the fair price, before venue and reputation. */
+  buyChance: number;
+}
+
+export const MERCH: Record<MerchKind, MerchConfig> = {
+  postcard: { label: 'Postcards', plural: 'postcards', unitCost: 1, fairPrice: 3, batch: 100, buyChance: 0.35 },
+  /** Prints are of whatever hangs on the floor: famous work sells more prints, an empty room sells none. */
+  print: { label: 'Art prints', plural: 'art prints', unitCost: 8, fairPrice: 25, batch: 25, buyChance: 0.1 },
+  keychain: { label: 'Keychains', plural: 'keychains', unitCost: 2, fairPrice: 8, batch: 50, buyChance: 0.15 },
+  /** T-shirts sell on the brand: they need reputation, and every one worn out the door is a walking ad. */
+  tshirt: { label: 'T-shirts', plural: 't-shirts', unitCost: 9, fairPrice: 30, batch: 20, buyChance: 0.06 },
+};
+
+export const SHOP = {
+  /** Most units of one line the stockroom holds. */
+  maxStock: 500,
+  /** Auto-restock tops up a line when it falls below this share of a batch. */
+  restockBelow: 0.25,
+  /** Highest price you can set, as a multiple of the fair price. */
+  maxPriceMultiple: 4,
+  /** Museum crowds are there for a day out; gallery visitors browse less but spend more. */
+  venueSpend: { museum: 1, gallery: 1.6 } as Record<VenueType, number>,
+  /** Event guests are in a spending mood. */
+  eventSpend: 1.5,
+  /** Buzz from one t-shirt worn around town. */
+  tshirtBuzz: 0.25,
 };

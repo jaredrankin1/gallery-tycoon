@@ -3,7 +3,7 @@ import { useContext } from 'preact/hooks';
 import type { Action, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from '../game';
 import type { Store } from './store';
 
-export type SheetId = 'collection' | 'people' | 'events' | 'books';
+export type SheetId = 'collection' | 'people' | 'events' | 'books' | 'shop';
 /** 'remove' is the bulldozer tool in the build tray. */
 export type BuildTool = FixtureKind | 'remove';
 

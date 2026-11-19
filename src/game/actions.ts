@@ -1,4 +1,4 @@
-import { EVENT_KIND, FIXTURE, RULES } from './config';
+import { EVENT_KIND, FIXTURE, MERCH, RULES, SHOP } from './config';
 import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
@@ -8,8 +8,9 @@ import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/pa
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
+import { openingStock, orderStock, shelfSpace } from './systems/shop';
 import { stepHour } from './clock';
-import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, StipendTier } from './types';
+import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, MerchKind, StipendTier } from './types';
 import { getVenueModel } from './venues';
 import { absHour } from './systems/visits';
 
@@ -35,6 +36,10 @@ export type Action =
   /** Open a themed show built from what's on the walls, or close it early. */
   | { type: 'mountExhibition'; theme: ExhibitionTheme }
   | { type: 'closeExhibition' }
+  /** Gift shop: order wholesale batches of one line, set its price, or toggle overnight restocking. */
+  | { type: 'restockMerch'; kind: MerchKind; batches: number }
+  | { type: 'setMerchPrice'; kind: MerchKind; price: number }
+  | { type: 'setAutoRestock'; on: boolean }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -102,6 +107,7 @@ function apply(state: GameState, action: Action): string | void {
       if (state.cash - cfg.cost < RULES.overdraftLimit) return 'You can’t afford that.';
       post(state, 'fit-out', -cfg.cost, `Built ${cfg.label.toLowerCase()}`);
       state.floor.fixtures.push({ id: newId(state, 'f'), kind: action.kind, x: action.x, y: action.y });
+      if (action.kind === 'shop') openingStock(state);
       return;
     }
     case 'removeFixture': {
@@ -200,6 +206,26 @@ function apply(state: GameState, action: Action): string | void {
     }
     case 'closeExhibition':
       return closeExhibition(state, true);
+    case 'restockMerch': {
+      const cfg = MERCH[action.kind];
+      if (!cfg) return 'Unknown item.';
+      if (!(action.batches >= 1)) return 'Order at least one batch.';
+      const qty = Math.min(Math.floor(action.batches) * cfg.batch, shelfSpace(state, action.kind));
+      if (qty > 0 && state.cash - qty * cfg.unitCost < RULES.overdraftLimit) return 'You can’t afford that.';
+      return orderStock(state, action.kind, qty);
+    }
+    case 'setMerchPrice': {
+      const cfg = MERCH[action.kind];
+      if (!cfg) return 'Unknown item.';
+      const max = cfg.fairPrice * SHOP.maxPriceMultiple;
+      if (!(action.price >= 1) || action.price > max) return `Pick a price between $1 and $${max}.`;
+      state.shop.lines[action.kind].price = Math.round(action.price);
+      return;
+    }
+    case 'setAutoRestock': {
+      state.shop.autoRestock = action.on;
+      return;
+    }
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) {

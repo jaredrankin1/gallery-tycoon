@@ -1,4 +1,4 @@
-import { FIXTURE, FIXTURE_EFFECTS, fitsOn, fixtureAt, getVenueModel } from '../game';
+import { FIXTURE, FIXTURE_EFFECTS, fitsOn, fixtureAt, getVenueModel, MERCH, MERCH_KINDS } from '../game';
 import { ArtThumb, money } from './bits';
 import { useGame } from './context';
 import { Icon } from './icons';
@@ -98,6 +98,20 @@ export function Inspector() {
             </button>
           </>
         )}
+      </>
+    );
+  } else if (f.kind === 'shop') {
+    const out = MERCH_KINDS.filter((k) => state.shop.lines[k].stock === 0);
+    body = (
+      <>
+        <h3>Gift shop</h3>
+        <p class="muted">
+          Took {money(state.shop.takingsToday)} today.{' '}
+          {out.length ? `Sold out: ${out.map((k) => MERCH[k].label.toLowerCase()).join(', ')}.` : 'Shelves stocked.'}
+        </p>
+        <button class="btn primary" onClick={() => setUi({ sheet: 'shop', selected: null })}>
+          Prices and stock
+        </button>
       </>
     );
   } else {

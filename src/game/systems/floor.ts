@@ -48,6 +48,7 @@ export function canPlace(floor: FloorPlan, kind: FixtureKind, x: number, y: numb
   if (x < 0 || y < 0 || x >= floor.width || y >= floor.height) return 'That’s outside the building.';
   if (x === floor.entrance.x && y === floor.entrance.y) return 'Keep the entrance clear.';
   if (fixtureAt(floor, x, y)) return 'Something is already there.';
+  if (kind === 'shop' && floor.fixtures.some((f) => f.kind === 'shop')) return 'You already have a gift shop.';
   if (FIXTURE[kind].wallOnly && x !== 0 && y !== 0) return 'Wall spots go against a back wall.';
   return undefined;
 }

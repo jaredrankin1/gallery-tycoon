@@ -14,6 +14,7 @@ export { canPlace, fixtureAt, displayFixtures, fitsOn } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
 export { buildReserve, planPlacement, shownOnFixture } from './systems/autohang';
+export { MERCH_KINDS, buyChance, merchAppeal, merchPriceDemand, shopCounter, takingsPerVisitor } from './systems/shop';
 export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';
 export { careerStage, potentialStars, isScouted, stageIndex, baseWorkValue } from './systems/careers';
 export { stipendFor, canSponsor, patronCount, signedWithRival, atRisk } from './systems/patronage';
