@@ -15,11 +15,11 @@ export const shortMoney = (n: number) => {
 };
 
 /** Procedural painting thumbnail that matches what hangs on the floor. */
-export function ArtThumb({ work, size = 'md' }: { work: Pick<Artwork, 'id' | 'image'>; size?: 'sm' | 'md' | 'lg' }) {
+export function ArtThumb({ work, size = 'md' }: { work: Pick<Artwork, 'id' | 'image' | 'form'>; size?: 'sm' | 'md' | 'lg' }) {
   const src = work.image && paintingUrl(work.image);
   if (src)
     return (
-      <span class={`thumb ${size} img`}>
+      <span class={`thumb ${size} img${work.form && work.form !== 'painting' ? ' obj' : ''}`}>
         <img src={src} alt="" loading="lazy" />
       </span>
     );

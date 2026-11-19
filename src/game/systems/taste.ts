@@ -66,4 +66,8 @@ export const TAG_LABEL: Record<string, string> = {
   weird: 'the weird stuff',
   illustration: 'illustration',
   fantasy: 'fantasy',
+  organic: 'organic forms',
+  ceramic: 'ceramics',
+  textile: 'fibre art',
+  toy: 'designer toys',
 };

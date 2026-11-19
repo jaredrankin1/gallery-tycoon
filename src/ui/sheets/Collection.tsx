@@ -81,7 +81,7 @@ export function CollectionSheet() {
                     </button>
                   ) : (
                     <button class="btn tiny primary" onClick={() => act({ type: 'setDisplay', artworkId: w.id, display: true })}>
-                      Hang
+                      {w.form === 'sculpture' ? 'Place' : 'Hang'}
                     </button>
                   )}
                 </div>

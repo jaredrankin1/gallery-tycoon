@@ -1,4 +1,4 @@
-import { FIXTURE, FIXTURE_EFFECTS, fixtureAt, getVenueModel } from '../game';
+import { FIXTURE, FIXTURE_EFFECTS, fitsOn, fixtureAt, getVenueModel } from '../game';
 import { ArtThumb, money } from './bits';
 import { useGame } from './context';
 import { Icon } from './icons';
@@ -67,14 +67,16 @@ export function Inspector() {
       </>
     );
   } else if (FIXTURE[f.kind].display) {
+    const fits = storage.filter((w) => fitsOn(w, f.kind));
+    const other = storage.length - fits.length;
     body = (
       <>
         <h3>{FIXTURE[f.kind].label} · empty</h3>
-        {storage.length ? (
+        {fits.length ? (
           <>
-            <p class="muted">Tap a work to hang it here.</p>
+            <p class="muted">Tap a work to {f.kind === 'pedestal' ? 'put it' : 'hang it'} here.</p>
             <div class="strip">
-              {storage.map((w) => (
+              {fits.map((w) => (
                 <button class="strip-item" onClick={() => act({ type: 'setDisplay', artworkId: w.id, display: true, fixtureId: f.id })}>
                   <ArtThumb work={w} />
                   <small>{w.title}</small>
@@ -84,7 +86,13 @@ export function Inspector() {
           </>
         ) : (
           <>
-            <p class="muted">Nothing in storage. Buy something first.</p>
+            <p class="muted">
+              {other
+                ? f.kind === 'pedestal'
+                  ? 'Nothing in storage stands on a pedestal. Sculpture does.'
+                  : 'What’s in storage needs a pedestal, not a wall.'
+                : 'Nothing in storage. Buy something first.'}
+            </p>
             <button class="btn primary" onClick={() => setUi({ sheet: 'collection', selected: null })}>
               Browse art for sale
             </button>

@@ -10,7 +10,7 @@ export { spentThisWeek, weekOf } from './systems/ledger';
 export { clockLabel, weekday } from './clock';
 export { collectionAppeal, priceDemand } from './venues/museum';
 export { getVenueModel } from './venues';
-export { canPlace, fixtureAt, displayFixtures } from './systems/floor';
+export { canPlace, fixtureAt, displayFixtures, fitsOn } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
 export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';

@@ -30,6 +30,9 @@ export interface Artist {
   tags: string[];
 }
 
+/** painting: walls or an easel on a pedestal. sculpture: pedestals only. hanging: walls only, no frame. */
+export type ArtForm = 'painting' | 'sculpture' | 'hanging';
+
 export type ArtworkStatus = 'offered' | 'storage' | 'display' | 'sold';
 
 export interface Artwork {
@@ -45,8 +48,10 @@ export interface Artwork {
   status: ArtworkStatus;
   /** Day an offer expires, or the day it was acquired/sold. */
   day: number;
-  /** Painting image key (src/assets/art). Missing = drawn procedurally (sculpture, installation). */
+  /** Image key (src/assets/art or src/assets/sculpture). Missing = drawn procedurally. */
   image?: string;
+  /** What kind of object it is. Missing = painting. */
+  form?: ArtForm;
   /** Extra tags for this one work, on top of the artist's. */
   tags?: string[];
 }

@@ -14,6 +14,9 @@ import {
 } from '../game';
 import { crowdAtlas, preloadSprites, SPRITES } from './sprites';
 import { paintingImage, preloadPaintings } from './paintings';
+
+/** Sculpture sprites are cut at this many times their size on the floor (for sharp zoom). */
+const SCULPTURE_SCALE = 2.8;
 import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
 
 export interface Theme {
@@ -422,6 +425,14 @@ export class IsoRenderer {
       ctx.setLineDash([]);
       return;
     }
+    const work = this.state!.artworks[f.artworkId];
+    if (work?.form === 'hanging') {
+      const img = this.imageFor(f.artworkId);
+      if (img) {
+        this.drawHanging(img, a, b, onLeft);
+        return;
+      }
+    }
     this.poly(quad(0), '#b08d57', '#6e5530');
     const img = this.imageFor(f.artworkId);
     if (img) {
@@ -441,7 +452,46 @@ export class IsoRenderer {
     this.poly(quad(0.3), `hsl(${(hue + 140) % 360} 55% 40%)`);
   }
 
-  /** The loaded image for a painting, or null for sculpture or while it loads. */
+  /**
+   * Fibre art on the wall: no frame, the piece itself hung flat against the
+   * wall between a and b, as big as fits and centred where a painting would be.
+   */
+  private drawHanging(img: HTMLImageElement, a: Pt, b: Pt, onLeft: boolean) {
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const ux = (b.x - a.x) / len;
+    const uy = (b.y - a.y) / len;
+    const k = Math.min((len * 1.4) / img.width, 64 / img.height);
+    const w = img.width * k;
+    const h = img.height * k;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 45 };
+    const ctx = this.ctx;
+    ctx.save();
+    // Soft shadow on the wall, then the piece. u runs along the wall, v straight down.
+    ctx.transform(ux * k, uy * k, 0, k, mid.x - (ux * w) / 2, mid.y - (uy * w) / 2 - h / 2);
+    ctx.filter = onLeft ? 'drop-shadow(1px 2px 1px rgba(0,0,0,0.35))' : 'drop-shadow(1px 2px 1px rgba(0,0,0,0.35)) brightness(0.93)';
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  }
+
+  /**
+   * A sculpture sprite standing on its tile. The sprite brings its own plinth,
+   * so it replaces the plain pedestal block.
+   */
+  private drawSculpture(img: HTMLImageElement, f: Fixture) {
+    const ctx = this.ctx;
+    const c = toScreen(f.x + 0.5, f.y + 0.5);
+    const k = 1 / SCULPTURE_SCALE;
+    const w = img.width * k;
+    const h = img.height * k;
+    const foot = c.y + 7; // the plinth's front edge, a little in front of the tile centre
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(c.x, foot - 3, w * 0.55, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.drawImage(img, c.x - w / 2, foot - h, w, h);
+  }
+
+  /** The loaded image for a work, or null if it has none or it's still loading. */
   private imageFor(artworkId: string): HTMLImageElement | null {
     const key = this.state?.artworks[artworkId]?.image;
     const img = key ? paintingImage(key) : null;
@@ -463,8 +513,12 @@ export class IsoRenderer {
     const ctx = this.ctx;
     switch (f.kind) {
       case 'pedestal': {
-        this.box(f.x, f.y, 26, '#ffffff', '#dcdcdc', '#c4c4c4', 0.25);
         const img = f.artworkId ? this.imageFor(f.artworkId) : null;
+        if (img && this.state!.artworks[f.artworkId!]?.form === 'sculpture') {
+          this.drawSculpture(img, f);
+          return;
+        }
+        this.box(f.x, f.y, 26, '#ffffff', '#dcdcdc', '#c4c4c4', 0.25);
         if (img) {
           // A painting on a pedestal sits on a small easel, facing you.
           const c = toScreen(f.x + 0.5, f.y + 0.5, 26);

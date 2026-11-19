@@ -1,10 +1,14 @@
 import { TITLE_A, TITLE_B } from '../../data/artists';
-import { PAINTINGS } from '../../data/paintings';
+import { PAINTINGS, type PaintingSeed } from '../../data/paintings';
+import { SCULPTURES } from '../../data/sculptures';
 import { DIFFICULTY, RULES } from '../config';
 import { Rng } from '../rng';
-import type { GameState } from '../types';
+import type { ArtForm, GameState } from '../types';
 import { baseWorkValue, friendDiscount } from './artists';
 import { notify } from './feed';
+
+/** Every real work in the game, paintings and sculpture alike. */
+const CATALOGUE: (PaintingSeed & { form?: ArtForm })[] = [...PAINTINGS, ...SCULPTURES];
 
 /** Drops expired offers and adds up to `count` new ones (never above marketSize). */
 export function refreshMarket(state: GameState, rng: Rng, count: number = RULES.newOffersPerDay): void {
@@ -24,10 +28,10 @@ export function refreshMarket(state: GameState, rng: Rng, count: number = RULES.
     const value = Math.round((baseWorkValue(artist) * rng.range(0.7, 1.4)) / 50) * 50;
     const price = Math.round((value * diff.artPriceMultiplier * (1 - friendDiscount(artist))) / 50) * 50;
     const id = `w-${state.nextId++}`;
-    // Real paintings first: one of theirs that isn't already on the market or in your hands.
+    // Real works first: one of theirs that isn't already on the market or in your hands.
     // Sold works can turn up again later, resold by their new owners.
     const taken = new Set(Object.values(state.artworks).filter((w) => w.status !== 'sold').map((w) => w.image));
-    const mine = PAINTINGS.filter((p) => p.artistId === artist.id);
+    const mine = CATALOGUE.filter((p) => p.artistId === artist.id);
     const fresh = mine.filter((p) => !taken.has(p.image));
     const painting = fresh.length ? rng.pick(fresh) : undefined;
     if (mine.length && !painting) {
@@ -45,6 +49,7 @@ export function refreshMarket(state: GameState, rng: Rng, count: number = RULES.
       status: 'offered',
       day: state.day + RULES.offerLifetimeDays - 1,
       ...(painting && { image: painting.image, tags: painting.tags }),
+      ...(painting?.form && { form: painting.form }),
     };
     if (artist.relationship >= RULES.relationshipForOffers) {
       notify(state, { kind: 'market', text: `${artist.name.split(' ')[0]} offered you “${title}”.` });

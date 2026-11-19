@@ -31,7 +31,7 @@ Footfall follows the time of day: busy afternoons, a trickle in the evening and
 almost nobody overnight, when the clock runs three times faster and the room
 goes dark.
 
-- **Art**: buy works that turn up on the market each day. There are 40 real paintings across seven painters, plus sculpture and installation pieces. Artists who like you offer more often and give a discount.
+- **Art**: buy works that turn up on the market each day. There are 40 real paintings across seven painters and 100 sculptures and fibre pieces across ten makers (geometric, organic, salvage, pop, brutalist, ceramic, fibre, vinyl toys, designer toys and classical marble). Sculpture stands on a pedestal; fibre wall hangings go on a wall spot, unframed. Artists who like you offer more often and give a discount.
 - **Floor**: tap a wall spot or pedestal to hang art, set its price (gallery) or take it down. Tap a painting on the wall to inspect it.
 - **Build**: wall spots, pedestals, a wine bar, benches and plants on the isometric grid, with a live placement preview.
 - **Marisol**, your gallery assistant, works the floor: dusting the art, talking visitors through pieces, clipboard rounds, greeting at the door. She cheers every sale and keeps watch by the door overnight.
@@ -84,11 +84,12 @@ src/
       museum.ts         Ticket sales, collection appeal, price demand
   data/artists.ts       Artist personas (with style tags) and artwork title parts
   data/paintings.ts     The painting catalogue: image, title, artist, extra style tags
+  data/sculptures.ts    The sculpture and fibre catalogue, with where each piece goes (form)
   data/guests.ts        Visitor characters: role, tastes, budget, traits, lines
   render/
     iso.ts              Isometric projection math (grid <-> screen)
     IsoRenderer.ts      Canvas renderer: walls, floor, fixtures, art, animated visitors, tap targets
-    paintings.ts        Painting images (built by tools/slice_art.py)
+    paintings.ts        Artwork images: paintings (tools/slice_art.py) and sculpture (tools/slice_sculpture.py)
     sprites.ts          Sprite atlases and portraits (built by tools/slice_sprites.py)
   ui/                   Preact UI
     store.ts            Holds the game, runs the real-time clock, autosaves
@@ -110,7 +111,8 @@ tests/game.test.ts      Logic tests
 - **Balance**: almost everything is in `config.ts`.
 - **New visitor**: drop a sprite sheet in `art/source/` (fixed grid layout) and run `python3 tools/slice_sprites.py`, or in `art/source/v2/` (free-form sheets) and point at each frame in `tools/slice_sprites_v2.py`, then run it. Run the v2 script after the first one, since the first rewrites `sprites.json`. Then add a seed to `src/data/guests.ts`.
 - **New painting**: add a card sheet to `art/source/paintings/`, run `python3 tools/slice_art.py`, and list each work in `src/data/paintings.ts`.
-- **Art**: rooms and sculpture are procedural; paintings and characters come from the sheets in `art/source/`.
+- **New sculpture**: add a 5x2 sheet to `art/source/sculptures/`, add its name to `SHEETS` in `tools/slice_sculpture.py` (and to `NO_PLINTH` if the pieces have no plinth), run it, and list each piece in `src/data/sculptures.ts`.
+- **Art**: rooms are procedural; paintings and characters come from the sheets in `art/source/`.
 
 ## Design rules
 

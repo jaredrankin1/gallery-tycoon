@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { assistantPose, createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, workTags, type Action, type GameState } from '../src/game';
+import { ARTIST_SEEDS } from '../src/data/artists';
+import { SCULPTURES } from '../src/data/sculptures';
+import { assistantPose, fitsOn, createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, workTags, type Action, type GameState } from '../src/game';
 
 const run = (s: GameState, a: Action) => {
   const r = dispatch(s, a);
@@ -8,6 +10,21 @@ const run = (s: GameState, a: Action) => {
 };
 const days = (s: GameState, n: number) => run(s, { type: 'tick', hours: n * TIME.ticksPerDay });
 const offers = (s: GameState) => Object.values(s.artworks).filter((w) => w.status === 'offered');
+/** Put an owned work on display, building a pedestal first if it's a sculpture with nowhere to stand. */
+const show = (s: GameState, id: string) => {
+  if (s.artworks[id].form === 'sculpture' && !s.floor.fixtures.some((f) => f.kind === 'pedestal' && !f.artworkId)) {
+    const { width, height } = s.floor;
+    outer: for (let y = 1; y < height - 1; y++)
+      for (let x = 1; x < width - 1; x++) {
+        const r = dispatch(s, { type: 'placeFixture', kind: 'pedestal', x, y });
+        if (r.ok) {
+          s = r.state;
+          break outer;
+        }
+      }
+  }
+  return run(s, { type: 'setDisplay', artworkId: id, display: true });
+};
 
 describe('new game', () => {
   it('starting cash follows difficulty', () => {
@@ -63,7 +80,7 @@ describe('venues', () => {
     s = run(s, { type: 'buyArtwork', artworkId: w.id });
     expect(s.cash).toBe(cash - w.price);
     expect(s.artists[w.artistId].relationship).toBeGreaterThan(0);
-    s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+    s = show(s, w.id);
     expect(s.artworks[w.id].status).toBe('display');
     expect(s.floor.fixtures.some((f) => f.artworkId === w.id)).toBe(true);
   });
@@ -73,7 +90,7 @@ describe('venues', () => {
     for (const w of offers(s).slice(0, 4)) {
       s = run(s, { type: 'buyArtwork', artworkId: w.id });
       s = run(s, { type: 'setPrice', artworkId: w.id, price: Math.round(s.artworks[w.id].value * 0.9) });
-      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+      s = show(s, w.id);
     }
     s = days(s, 30);
     expect(Object.values(s.artworks).some((w) => w.status === 'sold')).toBe(true);
@@ -84,7 +101,7 @@ describe('venues', () => {
     let s = createNewGame({ name: 'x', difficulty: 'normal', venue: 'museum', seed: 3 });
     for (const w of offers(s).slice(0, 2)) {
       s = run(s, { type: 'buyArtwork', artworkId: w.id });
-      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+      s = show(s, w.id);
     }
     const before = s.cash;
     s = run(s, { type: 'tick', hours: 6 });
@@ -140,7 +157,7 @@ describe('guests', () => {
     let s = createNewGame({ name: 'x', difficulty: 'easy', venue, seed });
     for (const w of offers(s).slice(0, 4)) {
       s = run(s, { type: 'buyArtwork', artworkId: w.id });
-      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+      s = show(s, w.id);
     }
     return s;
   };
@@ -202,7 +219,7 @@ describe('one person per visitor', () => {
       let s = createNewGame({ name: 'x', difficulty: 'easy', venue, seed: 21 });
       for (const w of offers(s).slice(0, 4)) {
         s = run(s, { type: 'buyArtwork', artworkId: w.id });
-        s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+        s = show(s, w.id);
       }
       s = days(s, 1);
       s = run(s, { type: 'tick', hours: TIME.ticksPerDay - s.tick });
@@ -224,7 +241,7 @@ describe('around the clock', () => {
     let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'museum', seed: 8 });
     for (const w of offers(s).slice(0, 4)) {
       s = run(s, { type: 'buyArtwork', artworkId: w.id });
-      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+      s = show(s, w.id);
     }
     s = run(s, { type: 'tick', hours: TIME.ticksPerDay - s.tick });
     let night = 0;
@@ -248,7 +265,7 @@ describe('around the clock', () => {
     let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'museum', seed: 8 });
     for (const w of offers(s).slice(0, 4)) {
       s = run(s, { type: 'buyArtwork', artworkId: w.id });
-      s = run(s, { type: 'setDisplay', artworkId: w.id, display: true });
+      s = show(s, w.id);
     }
     let crossed = 0;
     for (let d = 0; d < 6; d++) {
@@ -282,5 +299,43 @@ describe('gallery assistant', () => {
     const b = assistantPose(s, 3.5);
     expect([a.x, a.y]).toEqual([b.x, b.y]);
     expect(['idle', 'radio']).toContain(a.anim);
+  });
+});
+
+describe('sculpture and fibre art', () => {
+  it('every catalogued work has an image and a known artist', () => {
+    const files = new Set(Object.keys(import.meta.glob('../src/assets/sculpture/*.png')).map((f) => f.replace(/^.*\/|\.png$/g, '')));
+    const ids = new Set(ARTIST_SEEDS.map((a) => a.id));
+    expect(SCULPTURES.length).toBe(100);
+    for (const w of SCULPTURES) {
+      expect(files.has(w.image)).toBe(true);
+      expect(ids.has(w.artistId)).toBe(true);
+    }
+  });
+
+  it('sculpture stands on pedestals, hangings go on walls, paintings go anywhere', () => {
+    expect(fitsOn({ form: 'sculpture' }, 'pedestal')).toBe(true);
+    expect(fitsOn({ form: 'sculpture' }, 'wallHang')).toBe(false);
+    expect(fitsOn({ form: 'hanging' }, 'wallHang')).toBe(true);
+    expect(fitsOn({ form: 'hanging' }, 'pedestal')).toBe(false);
+    expect(fitsOn({}, 'wallHang')).toBe(true);
+    expect(fitsOn({}, 'pedestal')).toBe(true);
+    expect(fitsOn({}, 'bench')).toBe(false);
+  });
+
+  it('sculptors put real pieces on the market, and they only go on a pedestal', () => {
+    let s = createNewGame({ name: 'x', difficulty: 'easy', venue: 'gallery', seed: 5 });
+    let w = offers(s).find((o) => o.form === 'sculpture');
+    for (let d = 0; d < 30 && !w; d++) {
+      s = days(s, 1);
+      w = offers(s).find((o) => o.form === 'sculpture');
+    }
+    expect(w).toBeDefined();
+    s = run(s, { type: 'buyArtwork', artworkId: w!.id });
+    const wall = s.floor.fixtures.find((f) => f.kind === 'wallHang' && !f.artworkId)!;
+    expect(dispatch(s, { type: 'setDisplay', artworkId: w!.id, display: true, fixtureId: wall.id }).ok).toBe(false);
+    s = run(s, { type: 'setDisplay', artworkId: w!.id, display: true });
+    const spot = s.floor.fixtures.find((f) => f.artworkId === w!.id)!;
+    expect(spot.kind).toBe('pedestal');
   });
 });

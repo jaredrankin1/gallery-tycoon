@@ -3,7 +3,7 @@ import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
 import { chargeEvent, eventCost } from './systems/events';
-import { canPlace, freeDisplayFixture, unhang } from './systems/floor';
+import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
 import { stepHour } from './clock';
 import type { BudgetPlan, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from './types';
@@ -62,9 +62,10 @@ function apply(state: GameState, action: Action): string | void {
       }
       const target = action.fixtureId
         ? state.floor.fixtures.find((f) => f.id === action.fixtureId)
-        : freeDisplayFixture(state.floor);
-      if (!target) return 'No free wall spot or pedestal. Build one on the floor.';
+        : freeDisplayFixture(state.floor, work);
+      if (!target) return noSpotFor(work);
       if (!FIXTURE[target.kind].display) return 'You can’t hang art on that.';
+      if (!fitsOn(work, target.kind)) return work.form === 'sculpture' ? 'Sculpture goes on a pedestal.' : 'That piece needs a wall.';
       // Swapping: whatever was there goes back to storage.
       if (target.artworkId && target.artworkId !== work.id) state.artworks[target.artworkId].status = 'storage';
       unhang(state, work.id);
