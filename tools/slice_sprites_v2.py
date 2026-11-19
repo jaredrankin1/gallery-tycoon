@@ -93,6 +93,21 @@ WAIST_UP = {
     'hana': [(1365, 610), (1265, 610), (1100, 790), (1240, 790)],
     'assistant': [(68, 578), (205, 578), (343, 578), (480, 578), (620, 578), (740, 580), (1000, 575), (1250, 575), (1420, 575), (1130, 575), (875, 575)],
 }
+# The sheets draw some poses bigger than the standing figure (a closer
+# "camera" for sitting, crouching and lying down). Each is shrunk so the head
+# is the size it is when standing. Animation -> scale, or a frame point -> scale
+# for one frame. Measured by eye against the first idle frame.
+POSE_SCALE = {
+    'sunny': {'look': 0.88, 'think': 0.95, 'impressed': 0.77, 'disapprove': 0.78, 'photo': 0.81, 'notes': 0.82},
+    'hana': {'look': 0.75, 'think': 0.75, 'photo': 0.75, 'notes': 0.78},
+    'kofi': {'impressed': 0.8, 'photo': 0.8, 'notes': 0.8},
+    'beatrix': {(295, 800): 0.88, 'photo': 0.88},
+    'assistant': {'cheer': 0.72},
+}
+# Standing height relative to an average adult, from the sheets (Sunny is a
+# short fellow, Kofi tall).
+HEIGHT = {'sunny': 0.9, 'hana': 0.97, 'kofi': 1.05, 'beatrix': 1.0, 'assistant': 0.92}
+
 # (left, top, side) of the square portrait crop.
 PORTRAIT = {'sunny': (12, 10, 300), 'beatrix': (12, 24, 300), 'kofi': (8, 10, 296), 'hana': (14, 14, 268), 'assistant': (10, 6, 300)}
 
@@ -113,6 +128,18 @@ def own_frames(load, height):
     box = (xs.min(), ys.min(), xs.max() + 1, last[-1] + 1)
     w, h = round((box[2] - box[0]) * k), round((box[3] - box[1]) * k)
     return [f.crop(box).resize((w, h), Image.LANCZOS) for f in fs], round((feet - box[0]) * k)
+
+
+# The first sheets (slice_sprites.py) stand an average adult about 93% of the
+# cell's height, and the renderer draws a cell's height at a fixed size.
+STAND = 0.93
+
+
+def ref_height(stand, height):
+    """The atlas height the renderer should treat as one cell, so this
+    character stands as tall as the first sheets' people, times `height`.
+    Without it, a tall pose (arms up) would shrink the whole character."""
+    return round(stand / STAND / height)
 
 
 def figures(name):
@@ -190,11 +217,18 @@ def build(name):
     idle = frame_at(rgb, lab, sizes, boxes, FRAMES[name]['idle'][0])
     waist = set(WAIST_UP.get(name, []))
 
-    def get(p):
-        f = frame_at(rgb, lab, sizes, boxes, p)
-        return add_legs(f, idle) if p in waist else f
+    fix = POSE_SCALE.get(name, {})
 
-    frames = {a: [get(p) for p in pts] for a, pts in FRAMES[name].items()}
+    def get(anim, p):
+        f = frame_at(rgb, lab, sizes, boxes, p)
+        if p in waist:
+            return add_legs(f, idle)  # already matched to the standing head
+        k = fix.get(p, fix.get(anim, 1.0))
+        if k != 1.0:
+            f = f.resize((max(1, round(f.width * k)), max(1, round(f.height * k))), Image.LANCZOS)
+        return f
+
+    frames = {a: [get(a, p) for p in pts] for a, pts in FRAMES[name].items()}
     # Feet x for frames that bring their own anchor; the rest are centred on their legs.
     anchor = {}
     if name in OWN_SHEETS:
@@ -229,7 +263,7 @@ def build(name):
     Image.fromarray(rgb).crop((l, t, l + side, t + side)).resize((96, 96), Image.LANCZOS).quantize(128).save(
         os.path.join(OUT, f'{name}-portrait.png'), optimize=True
     )
-    return {'cell': [out_w, out_h], 'anims': {k: [r, len(frames[k])] for r, k in enumerate(order)}}
+    return {'cell': [out_w, out_h], 'ref': ref_height(idle.height * SCALE, HEIGHT.get(name, 1.0)), 'anims': {k: [r, len(frames[k])] for r, k in enumerate(order)}}
 
 
 if __name__ == '__main__':

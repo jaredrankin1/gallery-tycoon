@@ -14,7 +14,7 @@ import {
   type GuestVisit,
   type Segment,
 } from '../game';
-import { crowdAtlas, preloadSprites, SPRITES } from './sprites';
+import { crowdAtlas, preloadSprites, spriteScale, SPRITES } from './sprites';
 import { paintingImage, preloadPaintings } from './paintings';
 
 /** Sculpture sprites are cut at this many times their size on the floor (for sharp zoom). */
@@ -707,7 +707,7 @@ export class IsoRenderer {
         ? Math.min(frames - 1, Math.floor((p.local / p.span) * (frames + 1)))
         : Math.floor(p.local * perHour) % frames;
     const [cw, ch] = meta.cell;
-    const scale = 68 / ch;
+    const scale = spriteScale(meta);
     const pt = toScreen(p.x, p.y);
     const ctx = this.ctx;
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
@@ -781,7 +781,7 @@ export class IsoRenderer {
     const frame = looping ? Math.floor(local * perHour) % frames : Math.min(frames - 1, Math.floor((local / Math.max(0.01, dur)) * frames));
 
     const [cw, ch] = meta.cell;
-    const scale = 68 / ch;
+    const scale = spriteScale(meta);
     const p = toScreen(pose.x, pose.y);
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.22)';

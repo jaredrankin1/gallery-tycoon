@@ -5,6 +5,12 @@ import meta from '../assets/sprites/sprites.json';
 
 export interface SpriteMeta {
   cell: [number, number];
+  /**
+   * The atlas height drawn at the standard figure height, when it isn't the
+   * cell's. Set for sheets whose cell is stretched by a tall pose, so every
+   * pose keeps the standing scale.
+   */
+  ref?: number;
   /** Animation name (a GuestAnim for visitors; the assistant has her own) -> atlas row and frame count. */
   anims: Record<string, [row: number, frames: number]>;
 }
@@ -13,6 +19,9 @@ export const SPRITES = meta as unknown as Record<string, SpriteMeta>;
 
 const urls = import.meta.glob('../assets/sprites/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const url = (file: string) => urls[`../assets/sprites/${file}.png`];
+
+/** On-screen pixels per atlas pixel: a cell's height (or `ref`) draws 68px tall. */
+export const spriteScale = (meta: SpriteMeta) => 68 / (meta.ref ?? meta.cell[1]);
 
 const cache = new Map<string, HTMLImageElement>();
 
