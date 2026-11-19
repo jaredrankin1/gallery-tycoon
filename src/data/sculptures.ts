@@ -146,4 +146,16 @@ export const SCULPTURES: SculptureSeed[] = [
   s('marble-8', 'Medusa', 'a-castellani', ['moody']),
   s('marble-9', 'Old God of the Sea', 'a-castellani'),
   s('marble-10', 'Venus, Turned Away', 'a-castellani'),
+
+  // Cal Whitaker: the Old West in cast bronze.
+  s('western-1', 'The Roper', 'a-cal'),
+  s('western-2', 'The Elder', 'a-cal', ['portrait']),
+  s('western-3', 'Longhorn', 'a-cal'),
+  s('western-4', 'Trail Boss', 'a-cal', ['portrait']),
+  s('western-5', 'The Overland Stage', 'a-cal'),
+  s('western-6', 'Bronc Buster', 'a-cal'),
+  s('western-7', 'Calling the Pack', 'a-cal', ['moody']),
+  s('western-8', 'Prairie Daughter', 'a-cal', ['portrait']),
+  s('western-9', 'Grizzly on the Ridge', 'a-cal'),
+  s('western-10', 'Pack Mule', 'a-cal', ['quiet']),
 ];

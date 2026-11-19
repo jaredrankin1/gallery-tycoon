@@ -306,7 +306,7 @@ describe('sculpture and fibre art', () => {
   it('every catalogued work has an image and a known artist', () => {
     const files = new Set(Object.keys(import.meta.glob('../src/assets/sculpture/*.png')).map((f) => f.replace(/^.*\/|\.png$/g, '')));
     const ids = new Set(ARTIST_SEEDS.map((a) => a.id));
-    expect(SCULPTURES.length).toBe(100);
+    expect(SCULPTURES.length).toBe(110);
     for (const w of SCULPTURES) {
       expect(files.has(w.image)).toBe(true);
       expect(ids.has(w.artistId)).toBe(true);

@@ -408,15 +408,25 @@ export class IsoRenderer {
   /** A framed picture on the back wall above tile (f.x, f.y). */
   private drawWallHang(f: Fixture) {
     const onLeft = f.x === 0;
-    const a = onLeft ? toScreen(0, f.y + 0.08) : toScreen(f.x + 0.08, 0);
-    const b = onLeft ? toScreen(0, f.y + 0.92) : toScreen(f.x + 0.92, 0);
-    const lo = 18;
-    const hi = 72;
+    const pic = f.artworkId ? this.imageFor(f.artworkId) : null;
+    // Landscape canvases get a wider, shorter frame, centred where a tall one would hang.
+    const wide = !!pic && pic.width > pic.height;
+    const m = wide ? 0.02 : 0.08;
+    const a = onLeft ? toScreen(0, f.y + m) : toScreen(f.x + m, 0);
+    const b = onLeft ? toScreen(0, f.y + 1 - m) : toScreen(f.x + 1 - m, 0);
+    let lo = 18;
+    let hi = 72;
+    if (wide) {
+      const h = Math.min(hi - lo, (Math.hypot(b.x - a.x, b.y - a.y) * pic.height) / pic.width + 4);
+      lo = 45 - h / 2;
+      hi = 45 + h / 2;
+    }
+    const lift = (hi - lo) * 0.37; // frame border, scaled with the frame
     const quad = (inset: number) => [
-      { x: a.x + (b.x - a.x) * inset, y: a.y + (b.y - a.y) * inset - lo - inset * 20 },
-      { x: b.x - (b.x - a.x) * inset, y: b.y - (b.y - a.y) * inset - lo - inset * 20 },
-      { x: b.x - (b.x - a.x) * inset, y: b.y - (b.y - a.y) * inset - hi + inset * 20 },
-      { x: a.x + (b.x - a.x) * inset, y: a.y + (b.y - a.y) * inset - hi + inset * 20 },
+      { x: a.x + (b.x - a.x) * inset, y: a.y + (b.y - a.y) * inset - lo - inset * lift },
+      { x: b.x - (b.x - a.x) * inset, y: b.y - (b.y - a.y) * inset - lo - inset * lift },
+      { x: b.x - (b.x - a.x) * inset, y: b.y - (b.y - a.y) * inset - hi + inset * lift },
+      { x: a.x + (b.x - a.x) * inset, y: a.y + (b.y - a.y) * inset - hi + inset * lift },
     ];
     if (!f.artworkId) {
       const ctx = this.ctx;
