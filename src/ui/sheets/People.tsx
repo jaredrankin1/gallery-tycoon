@@ -3,6 +3,7 @@ import { portraitUrl } from '../../render/sprites';
 import { RelationshipBar, Seg, Sheet } from '../bits';
 import { useGame } from '../context';
 import { ArtistList } from './Artists';
+import { StaffList } from './Staff';
 
 export const affinityLabel = (a: number) =>
   a >= 60 ? 'Devoted' : a >= 30 ? 'A fan' : a >= 10 ? 'Warming up' : a > -10 ? 'Undecided' : a > -35 ? 'Unconvinced' : 'Not a fan';
@@ -104,12 +105,13 @@ export function PeopleSheet() {
         options={[
           { value: 'guests', label: 'Visitors' },
           { value: 'artists', label: 'Artists' },
+          { value: 'staff', label: 'Staff' },
         ]}
         value={ui.peopleTab}
         onPick={(v) => setUi({ peopleTab: v })}
       />
       <div class="gap" />
-      {ui.peopleTab === 'guests' ? <GuestList /> : <ArtistList />}
+      {ui.peopleTab === 'guests' ? <GuestList /> : ui.peopleTab === 'staff' ? <StaffList /> : <ArtistList />}
     </Sheet>
   );
 }

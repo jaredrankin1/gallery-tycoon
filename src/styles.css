@@ -502,3 +502,17 @@ q.said::after { content: '”'; }
 .moods { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.4cqw 2.4cqw; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .moods > span:nth-child(3n + 1) { text-align: right; }
 .moods > span.on { color: var(--ink); font-weight: 800; }
+
+/* ---- Staff ---------------------------------------------------------------- */
+.staff-role .role-head { display: flex; flex-direction: column; gap: 0.6cqw; }
+.staff-role .role-head .label { margin: 0; }
+.staff-role.filled { border-left: 2.2cqw solid var(--blue); }
+.staff-role .effect { font-size: 0.74em; font-weight: 600; color: var(--ink); background: var(--paper); border: 0.35cqw solid var(--ink); padding: 1.2cqw 2cqw; }
+.applicant { display: flex; flex-direction: column; gap: 2cqw; padding-top: 3cqw; border-top: 0.45cqw solid var(--ink); }
+.applicant .btn { align-self: flex-start; }
+.skill { display: inline-flex; gap: 0.9cqw; flex: none; }
+.skill i { width: 2.6cqw; height: 2.6cqw; border: 0.4cqw solid var(--ink); background: var(--paper); }
+.skill i.on { background: var(--yellow); }
+.skill i.on:nth-child(2) { background: var(--red); border-radius: 50%; }
+.skill i.on:nth-child(3) { background: var(--blue); clip-path: polygon(50% 0, 100% 100%, 0 100%); border: 0; width: 3cqw; height: 3cqw; }
+canvas.portrait { object-fit: contain; }

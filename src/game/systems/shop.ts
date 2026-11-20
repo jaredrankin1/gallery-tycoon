@@ -3,6 +3,7 @@ import { clamp, type Rng } from '../rng';
 import type { GameState, GiftShop, MerchKind } from '../types';
 import { notify } from './feed';
 import { post } from './ledger';
+import { internShopBoost } from './staff';
 
 export const MERCH_KINDS = Object.keys(MERCH) as MerchKind[];
 
@@ -46,6 +47,7 @@ export function buyChance(state: GameState, kind: MerchKind, spend = 1): number 
       merchAppeal(state, kind) *
       SHOP.venueSpend[state.venue] *
       (0.6 + state.reputation / 100) *
+      internShopBoost(state) *
       spend,
     0,
     0.95,

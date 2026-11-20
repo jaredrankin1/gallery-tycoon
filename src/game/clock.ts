@@ -10,6 +10,7 @@ import { post } from './systems/ledger';
 import { refreshMarket } from './systems/market';
 import { shopEndOfDay, shopSales } from './systems/shop';
 import { hourOfGuests } from './systems/visits';
+import { payStaff, staffEndOfDay } from './systems/staff';
 import type { DayReport, GameState } from './types';
 import { getVenueModel } from './venues';
 
@@ -68,11 +69,12 @@ function endOfDay(state: GameState, rng: Rng): void {
     post(state, 'rent', -diff.weeklyRent, 'Rent');
     post(state, 'staff', -diff.weeklyStaff, 'Staff');
     if (upkeep > 0) post(state, 'staff', -upkeep, 'Guards & climate control');
-    const total = diff.weeklyRent + diff.weeklyStaff + upkeep;
+    const total = diff.weeklyRent + diff.weeklyStaff + upkeep + payStaff(state);
     notify(state, { kind: 'bills', text: `Weekly bills paid: $${total.toLocaleString('en-US')}`, amount: -total });
     weeklyPatronage(state, rng);
   }
 
+  staffEndOfDay(state, rng);
   endOfDayArtists(state);
   endOfDayPatronage(state, rng);
   endOfDayCareers(state, rng);

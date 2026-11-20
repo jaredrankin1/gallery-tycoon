@@ -88,6 +88,8 @@ export interface Artwork {
   grade: number;
   /** Delivered by an artist you sponsor. */
   commissioned?: boolean;
+  /** Taken off the floor by a thief (status is 'sold' so it can turn up on the market again). */
+  stolen?: boolean;
 }
 
 // ---- Exhibitions: themed shows that run for a week -----------------------------
@@ -398,7 +400,21 @@ export interface HangJob {
   faceLeft: boolean;
 }
 
+/** Hireable staff on top of Marisol. See data/staff.ts for the candidates and systems/staff.ts for what each does. */
+export type StaffRole = 'security' | 'appraiser' | 'curator' | 'intern';
+
+export interface Hire {
+  /** Which candidate (data/staff.ts). */
+  candidateId: Id;
+  /** Day they started. */
+  since: number;
+  /** Wages earned since the last payday, paid with the weekly bills (or on leaving). */
+  owed: number;
+}
+
 export interface StaffState {
+  /** Who you've taken on, by role. One per role. */
+  hired?: Partial<Record<StaffRole, Hire>>;
   /** Marisol places new art herself: makes room, builds a spot if she can, hangs it. */
   autoHang: boolean;
   /** Works she has already dealt with (or that were already here when auto-hang came on). */

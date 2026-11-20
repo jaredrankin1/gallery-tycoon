@@ -10,6 +10,7 @@ import { notify } from './feed';
 import { eventGuests } from './visits';
 import { post } from './ledger';
 import { shopSales } from './shop';
+import { curatorEventBonus } from './staff';
 
 export function hospitalityCost(plan: HospitalityPlan): number {
   return plan.guests * (WINE_PER_GUEST[plan.wine] + CHEESE_PER_GUEST[plan.cheese]);
@@ -39,7 +40,7 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
   const coverage = clamp(guests / attendance, 0, 1);
   const quality = (wine + cheese) / 6;
   const barBonus = countFixtures(state.floor, 'bar') * FIXTURE_EFFECTS.barSatisfaction;
-  const satisfaction = wine + cheese === 0 ? 0.25 : clamp(coverage * (0.3 + 0.7 * quality) + barBonus, 0, 1);
+  const satisfaction = wine + cheese === 0 ? 0.25 : clamp(coverage * (0.3 + 0.7 * quality) + barBonus + curatorEventBonus(state), 0, 1);
 
   const reputationDelta = Math.round(cfg.prestige * (satisfaction - 0.4) * 2 * 10) / 10;
   state.reputation = clamp(state.reputation + reputationDelta, 0, 100);

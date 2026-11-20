@@ -14,6 +14,20 @@ export { canPlace, fixtureAt, displayFixtures, fitsOn } from './systems/floor';
 export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
 export { moodAt, finalMood, moodWord, MOOD_AXES, MOOD_POLES } from './systems/moods';
 export { Steering, type Walker } from './systems/steering';
+export {
+  STAFF_ROLE_ORDER,
+  appraiserDiscount,
+  candidatesFor,
+  guardStops,
+  hired,
+  incidentChance,
+  salaryOf,
+  staffPoses,
+  staffPower,
+  weeklySalaries,
+  type StaffPose,
+} from './systems/staff';
+export { STAFF_CANDIDATES, type StaffCandidate } from '../data/staff';
 export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
 export { buildReserve, planPlacement, shownOnFixture } from './systems/autohang';
 export { MERCH_KINDS, buyChance, merchAppeal, merchPriceDemand, shopCounter, takingsPerVisitor } from './systems/shop';

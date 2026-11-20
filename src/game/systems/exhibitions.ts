@@ -5,6 +5,7 @@ import { addFame } from './careers';
 import { notify } from './feed';
 import { post } from './ledger';
 import { workTags } from './taste';
+import { curatorSynergy, hired } from './staff';
 
 // Curated exhibitions: pick a theme, hang works that fit it, and the show runs
 // for a week. How well the walls hang together (synergy) brings crowds, lifts
@@ -73,6 +74,9 @@ export function synergy(state: GameState, theme: ExhibitionTheme): Synergy {
   if (state.exhibitionHistory.slice(-2).some((h) => themeKey(h.theme) === key)) {
     bonuses.push({ label: 'Seen it', value: -EXHIBITION.repeatPenalty, hint: 'You ran this theme recently' });
   }
+
+  const curator = hired(state, 'curator');
+  if (curator) bonuses.push({ label: 'Curated', value: curatorSynergy(state), hint: `${curator.who.name.split(' ')[0]} wrote the wall texts` });
 
   if (on.length < EXHIBITION.minWorks) bonuses.push({ label: 'Thin', value: -0.2, hint: `Needs ${EXHIBITION.minWorks}+ works on theme` });
 
