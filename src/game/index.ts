@@ -37,3 +37,4 @@ export { stipendFor, canSponsor, patronCount, signedWithRival, atRisk } from './
 export { synergy, themeTitle, fitsTheme, exhibitionCost, liveScore, type Synergy, type SynergyBonus } from './systems/exhibitions';
 export { askingBid, withPremium, saleIsLive, nextSaleDay, hostedLots, hostedAuctionTooSoon } from './systems/auctions';
 export { callTimeline, callPrice, speakerName, toneScore, voiceOf } from './systems/artistCalls';
+export { startTutorial, tutorialOn } from './systems/tutorial';

@@ -370,9 +370,6 @@ q.said::after { content: '”'; }
 .guest-card .tastes { font-size: 0.92em; }
 
 /* ---- first-run tip ---- */
-.coach { position: absolute; left: 3cqw; right: 3cqw; bottom: 19cqw; display: flex; align-items: center; gap: 2.6cqw; background: var(--paper-2); border: var(--rule) solid var(--ink); border-left: 2.6cqw solid var(--yellow); border-radius: 0; padding: 2.6cqw 3cqw; z-index: 7; box-shadow: 1cqw 1cqw 0 var(--ink); animation: sheet-up 0.25s ease-out; font-size: 0.88em; }
-.coach img { width: 11cqw; height: 11cqw; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 0.45cqw var(--ink); flex: none; }
-.coach p { flex: 1; }
 .dock button.pulse .dock-icon::before { animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 1; transform: scale(1.12); } }
 
@@ -576,3 +573,27 @@ canvas.portrait { object-fit: contain; }
 .reply:active:not(:disabled) { background: var(--yellow); transform: translate(0.4cqw, 0.4cqw); }
 .reply.buy::before { background: var(--red); border-radius: 50%; }
 .reply small { display: block; color: var(--bad); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68em; margin-top: 0.6cqw; }
+
+/* ---------- Marisol's opening-week tour: one task card at a time ---------- */
+.mission { position: absolute; left: 3cqw; right: 3cqw; z-index: 7; background: var(--paper-2); border: var(--rule) solid var(--ink); border-left: 2.6cqw solid var(--yellow); border-radius: 0; box-shadow: 1cqw 1cqw 0 var(--ink); padding: 2.4cqw 3cqw 2.6cqw; display: flex; flex-direction: column; gap: 1.8cqw; font-size: 0.86em; animation: sheet-up 0.25s ease-out; }
+.mission.low { bottom: 19cqw; }
+/* Toasts (z 8) float over it for their few seconds, then it is back. */
+.mission.high { top: 26cqw; }
+.mission.ticked { border-left-color: var(--blue); }
+.mission-head { display: flex; align-items: baseline; gap: 2cqw; }
+.mission-head b { flex: 1; min-width: 0; font-family: var(--display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+.mission-tag { flex: none; background: var(--ink); color: var(--paper); font-size: 0.68em; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; padding: 0.5cqw 1.6cqw; }
+.mission-skip { flex: none; background: none; border: 0; padding: 0.6cqw 0; font-size: 0.72em; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: underline; text-decoration-thickness: 0.35cqw; text-underline-offset: 0.6cqw; color: var(--muted); }
+.mission-body { display: flex; align-items: center; gap: 2.6cqw; }
+.mission-body img { width: 11cqw; height: 11cqw; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 0.45cqw var(--ink); flex: none; }
+.mission.high .mission-body img { width: 8.5cqw; height: 8.5cqw; }
+.mission-body p { flex: 1; line-height: 1.38; }
+.mission-foot { display: flex; align-items: center; justify-content: space-between; gap: 2cqw; }
+.mission-foot .btn { padding: 1.6cqw 3cqw; font-size: 0.8em; }
+.mission-bar { display: flex; gap: 0.9cqw; }
+.mission-bar i { width: 3.4cqw; height: 1.6cqw; border: 0.35cqw solid var(--ink); background: transparent; }
+.mission-bar i.on { background: var(--ink); }
+.mission-bar i.now { background: var(--red); }
+.mission-later { background: none; border: 0; display: inline-flex; align-items: center; gap: 1cqw; font-size: 0.74em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0.6cqw 0; }
+.dock button.pulse { background: var(--yellow); }
+.mission.slim { padding-top: 1.6cqw; padding-bottom: 1.6cqw; }

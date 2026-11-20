@@ -1,4 +1,4 @@
-import { EVENT_KIND, FIXTURE, MERCH, RULES, SHOP } from './config';
+import { EVENT_KIND, FIXTURE, MERCH, RULES, SHOP, TUTORIAL } from './config';
 import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
@@ -9,6 +9,7 @@ import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/pa
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
+import { advanceTutorial, skipTutorial, startTutorial } from './systems/tutorial';
 import { notify } from './systems/feed';
 import { openingStock, orderStock, shelfSpace } from './systems/shop';
 import { hostedAuctionTooSoon, passLot, placeBid } from './systems/auctions';
@@ -20,6 +21,8 @@ import { absHour } from './systems/visits';
 
 /** Every player decision is one of these. The UI never mutates state directly. */
 export type Action =
+  /** Marisol's opening-week tour: start (or replay) it, move to the next task, or skip the rest. */
+  | { type: 'tutorial'; to: 'start' | 'next' | 'skip'; passed?: boolean }
   | { type: 'buyArtwork'; artworkId: Id }
   /** Hang a work on a display fixture (first free one if fixtureId is omitted), or take it down. */
   | { type: 'setDisplay'; artworkId: Id; display: boolean; fixtureId?: Id }
@@ -270,6 +273,11 @@ function apply(state: GameState, action: Action): string | void {
     }
     case 'leaveTalk':
       return leaveTalk(state);
+    case 'tutorial':
+      if (action.to === 'start') startTutorial(state);
+      else if (action.to === 'next') advanceTutorial(state, TUTORIAL.steps, !!action.passed);
+      else skipTutorial(state);
+      return;
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) {

@@ -580,3 +580,14 @@ export const ARTIST_CALLS = {
   /** Artists this cold won't bother coming. */
   minRelationship: -20,
 };
+
+/** Marisol's opening-week tour (src/ui/Tutorial.tsx has the tasks). */
+export const TUTORIAL = {
+  /** Must match TUTORIAL_STEPS.length; a test checks. */
+  steps: 9,
+  /** Paid once, on finishing the last task. */
+  rewardCash: 1_000,
+  rewardReputation: 3,
+  /** Pass over more tasks than this and the gift isn't paid. */
+  maxPassedForReward: 3,
+};
