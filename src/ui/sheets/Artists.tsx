@@ -17,7 +17,10 @@ import {
   type Artist,
   type StipendTier,
 } from '../../game';
-import { Avatar, Meter, money, RelationshipBar } from '../bits';
+import { ArtThumb, Avatar, Meter, money, RelationshipBar } from '../bits';
+import { PAINTINGS, type PaintingSeed } from '../../data/paintings';
+import { SCULPTURES, type SculptureSeed } from '../../data/sculptures';
+import type { GameState } from '../../game';
 import { useGame } from '../context';
 import { Icon } from '../icons';
 
@@ -54,6 +57,21 @@ export function ArtistList() {
   );
 }
 
+/**
+ * One piece that shows what an artist makes: something of theirs you own,
+ * else something of theirs in the game, else the first piece in their catalogue.
+ */
+function sampleWork(state: GameState, a: Artist) {
+  const theirs = Object.values(state.artworks).filter((w) => w.artistId === a.id && w.image && !w.stolen);
+  const owned = theirs.find((w) => w.status === 'display') ?? theirs.find((w) => w.status === 'storage');
+  if (owned) return { id: owned.id, image: owned.image, form: owned.form, title: owned.title, note: 'In your collection' };
+  if (theirs[0]) return { id: theirs[0].id, image: theirs[0].image, form: theirs[0].form, title: theirs[0].title, note: 'Recent work' };
+  const seed: (PaintingSeed & { form?: SculptureSeed['form'] }) | undefined =
+    PAINTINGS.find((w) => w.artistId === a.id) ?? SCULPTURES.find((w) => w.artistId === a.id);
+  if (seed) return { id: seed.image, image: seed.image, form: seed.form, title: seed.title, note: 'Recent work' };
+  return null;
+}
+
 function ArtistCard({ a }: { a: Artist }) {
   const { state, setUi, act, toast } = useGame();
   const [picking, setPicking] = useState(false);
@@ -64,6 +82,7 @@ function ArtistCard({ a }: { a: Artist }) {
   const first = a.name.split(' ')[0];
   const sponsorBlock = canSponsor(state, a);
   const rival = signedWithRival(state, a);
+  const sample = sampleWork(state, a);
 
   return (
     <div class={`artist ${a.patron ? 'sponsored' : ''}`}>
@@ -77,6 +96,15 @@ function ArtistCard({ a }: { a: Artist }) {
         </div>
         <span class={`rel-pill ${a.relationship >= 35 ? 'good' : a.relationship < -10 ? 'bad' : ''}`}>{relationshipLabel(a.relationship)}</span>
       </div>
+      {sample && (
+        <figure class="artist-sample">
+          <ArtThumb work={sample} size="lg" />
+          <figcaption>
+            <b class="clamp">“{sample.title}”</b>
+            <small class="muted">{sample.note}</small>
+          </figcaption>
+        </figure>
+      )}
       <p class="bio">{a.bio}</p>
       <div class="stats">
         <span>Relationship</span>
