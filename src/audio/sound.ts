@@ -1,7 +1,8 @@
+import { Jazz } from './jazz';
 import { whisper } from './whisper';
 
 /**
- * The gallery's sound: hushed whispers that follow how many people are on the
+ * The gallery's sound: a soft jazz combo playing in the background (jazz.ts), hushed whispers that follow how many people are on the
  * floor, a quiet room tone, and short synthesized effects (door chime, sales,
  * camera clicks, glasses at parties, button taps). Everything is generated in
  * the browser, so nothing has to load.
@@ -49,6 +50,8 @@ class Sound {
   private live = 0;
   private nextSwap = 0;
   private hum: GainNode | null = null;
+  private music: GainNode | null = null;
+  private jazz: Jazz | null = null;
   private listeners = new Set<() => void>();
   private last: Partial<Record<Sfx, number>> = {};
   private nextClink = 0;
@@ -177,7 +180,21 @@ class Sound {
     this.whispers.connect(this.room);
     // Snippets are synthesized a few at a time so the first tap stays snappy.
     this.fillBank(0);
+
+    // Background music: fades in over a few seconds, with a touch of the room's reverb.
+    this.music = ctx.createGain();
+    this.music.gain.value = 0;
+    this.music.gain.setTargetAtTime(Sound.MUSIC, ctx.currentTime + 0.3, 1.5);
+    this.music.connect(this.master);
+    const send = ctx.createGain();
+    send.gain.value = 0.25;
+    this.music.connect(send).connect(this.room);
+    this.jazz = new Jazz(ctx, this.music);
+    this.jazz.start();
   }
+
+  /** Music level against the effects and whispers. */
+  private static MUSIC = 0.55;
 
   private static BANK = 36;
   private static SR = 22050;
@@ -219,6 +236,8 @@ class Sound {
     // Frozen in time: the room goes almost silent.
     const { paused } = this.ambience;
     this.whispers.gain.setTargetAtTime(paused ? 0.35 : 1, ctx.currentTime, 0.6);
+    // The band plays on, a little softer.
+    this.music?.gain.setTargetAtTime(Sound.MUSIC * (paused ? 0.6 : 1), ctx.currentTime, 0.8);
   }
 
   /**
