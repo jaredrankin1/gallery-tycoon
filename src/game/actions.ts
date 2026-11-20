@@ -1,13 +1,22 @@
-import { EVENT_KIND, FIXTURE, RULES } from './config';
+import { EVENT_KIND, FIXTURE, MERCH, RULES, SHOP } from './config';
 import { Rng } from './rng';
 import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
+import { ensureStaff, park, staffUpdate, unpark } from './systems/autohang';
+import { closeExhibition, mountExhibition } from './systems/exhibitions';
+import { beginTalk, chooseTalk, leaveTalk } from './systems/artistCalls';
+import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/patronage';
 import { chargeEvent, eventCost } from './systems/events';
-import { canPlace, freeDisplayFixture, unhang } from './systems/floor';
+import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
-import { advanceWeek } from './turn';
-import type { BudgetPlan, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from './types';
+import { notify } from './systems/feed';
+import { openingStock, orderStock, shelfSpace } from './systems/shop';
+import { hostedAuctionTooSoon, passLot, placeBid } from './systems/auctions';
+import { appraiserDiscount, hire, hired, letGo } from './systems/staff';
+import { stepHour } from './clock';
+import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, MerchKind, StaffRole, StipendTier } from './types';
 import { getVenueModel } from './venues';
+import { absHour } from './systems/visits';
 
 /** Every player decision is one of these. The UI never mutates state directly. */
 export type Action =
@@ -19,10 +28,34 @@ export type Action =
   | { type: 'setPrice'; artworkId: Id; price: number }
   | { type: 'setTicketPrice'; price: number }
   | { type: 'studioVisit'; artistId: Id }
-  | { type: 'scheduleEvent'; kind: EventKind; week: number; featuredArtistIds: Id[]; hospitality: HospitalityPlan }
+  | { type: 'scheduleEvent'; kind: EventKind; day: number; featuredArtistIds: Id[]; hospitality: HospitalityPlan }
   | { type: 'cancelEvent'; eventId: Id }
   | { type: 'setBudget'; budget: BudgetPlan }
-  | { type: 'advanceWeek' };
+  /** Marisol places new art herself (makes room, builds a spot if affordable, hangs it). */
+  | { type: 'setAutoHang'; on: boolean }
+  /** Patronage: put an artist on a weekly stipend, change it, or end it. */
+  | { type: 'signPatron'; artistId: Id; tier: StipendTier }
+  | { type: 'setStipend'; artistId: Id; tier: StipendTier }
+  | { type: 'endPatronage'; artistId: Id }
+  /** Open a themed show built from what's on the walls, or close it early. */
+  | { type: 'mountExhibition'; theme: ExhibitionTheme }
+  | { type: 'closeExhibition' }
+  /** Gift shop: order wholesale batches of one line, set its price, or toggle overnight restocking. */
+  | { type: 'restockMerch'; kind: MerchKind; batches: number }
+  | { type: 'setMerchPrice'; kind: MerchKind; price: number }
+  | { type: 'setAutoRestock'; on: boolean }
+  /** Auction house sale: raise your paddle on a lot (one increment), or let it go. */
+  | { type: 'auctionBid'; lot: number }
+  | { type: 'auctionPass'; lot: number }
+  /** Staff: take someone on (replacing whoever holds that job), or let them go. */
+  | { type: 'hireStaff'; candidateId: string }
+  | { type: 'letGoStaff'; role: StaffRole }
+  /** Artist visits: walk over and talk, pick a line, or walk off. */
+  | { type: 'talkToArtist' }
+  | { type: 'talkChoose'; optionId: string }
+  | { type: 'leaveTalk' }
+  /** Advance the clock by some hours. The real-time loop sends this. */
+  | { type: 'tick'; hours: number };
 
 export type ActionResult = { ok: true; state: GameState } | { ok: false; state: GameState; error: string };
 
@@ -34,20 +67,31 @@ export function dispatch(prev: GameState, action: Action): ActionResult {
   if (prev.status !== 'playing') return { ok: false, state: prev, error: 'The game is over.' };
   const state = structuredClone(prev);
   const error = apply(state, action);
-  return error ? { ok: false, state: prev, error } : { ok: true, state };
+  if (error) return { ok: false, state: prev, error };
+  // New arrivals: Marisol picks them up. After a tick the screen is at the new hour;
+  // otherwise it's partway through the current one, so she starts at the next.
+  staffUpdate(state, absHour(state) + (action.type === 'tick' ? 0 : 1));
+  return { ok: true, state };
 }
 
 function apply(state: GameState, action: Action): string | void {
   switch (action.type) {
     case 'buyArtwork': {
       const work = state.artworks[action.artworkId];
-      if (!work || work.status !== 'offered') return 'That work is no longer available.';
-      if (state.cash - work.price < RULES.overdraftLimit) return 'You can’t afford that.';
-      post(state, 'art', -work.price, `Bought "${work.title}"`);
-      work.acquiredFor = work.price;
+      if (!work || work.status !== 'offered' || work.withArtist) return 'That work is no longer available.';
+      // An appraiser on staff talks the dealer down.
+      const cut = Math.round((work.price * appraiserDiscount(state)) / 10) * 10;
+      const paid = work.price - cut;
+      if (state.cash - paid < RULES.overdraftLimit) return 'You can’t afford that.';
+      post(state, 'art', -paid, `Bought "${work.title}"`);
+      if (cut > 0) {
+        const who = hired(state, 'appraiser')!.who.name.split(' ')[0];
+        notify(state, { kind: 'staff', text: `${who} talked the dealer down $${cut.toLocaleString('en-US')} on “${work.title}”.` });
+      }
+      work.acquiredFor = paid;
       work.price = Math.round((work.value * state.settings.defaultMarkup) / 50) * 50;
       work.status = 'storage';
-      work.week = state.week;
+      work.day = state.day;
       adjustRelationship(state, work.artistId, 5);
       return;
     }
@@ -57,15 +101,21 @@ function apply(state: GameState, action: Action): string | void {
       if (!action.display) {
         unhang(state, work.id);
         work.status = 'storage';
+        park(state, work.id);
         return;
       }
       const target = action.fixtureId
         ? state.floor.fixtures.find((f) => f.id === action.fixtureId)
-        : freeDisplayFixture(state.floor);
-      if (!target) return 'No free wall spot or pedestal. Build one on the floor.';
+        : freeDisplayFixture(state.floor, work);
+      if (!target) return noSpotFor(work);
       if (!FIXTURE[target.kind].display) return 'You can’t hang art on that.';
+      if (!fitsOn(work, target.kind)) return work.form === 'sculpture' ? 'Sculpture goes on a pedestal.' : 'That piece needs a wall.';
       // Swapping: whatever was there goes back to storage.
-      if (target.artworkId && target.artworkId !== work.id) state.artworks[target.artworkId].status = 'storage';
+      if (target.artworkId && target.artworkId !== work.id) {
+        state.artworks[target.artworkId].status = 'storage';
+        park(state, target.artworkId);
+      }
+      unpark(state, work.id);
       unhang(state, work.id);
       target.artworkId = work.id;
       work.status = 'display';
@@ -78,13 +128,17 @@ function apply(state: GameState, action: Action): string | void {
       if (state.cash - cfg.cost < RULES.overdraftLimit) return 'You can’t afford that.';
       post(state, 'fit-out', -cfg.cost, `Built ${cfg.label.toLowerCase()}`);
       state.floor.fixtures.push({ id: newId(state, 'f'), kind: action.kind, x: action.x, y: action.y });
+      if (action.kind === 'shop') openingStock(state);
       return;
     }
     case 'removeFixture': {
       const idx = state.floor.fixtures.findIndex((f) => f.id === action.fixtureId);
       if (idx < 0) return 'Nothing there.';
       const [f] = state.floor.fixtures.splice(idx, 1);
-      if (f.artworkId) state.artworks[f.artworkId].status = 'storage';
+      if (f.artworkId) {
+        state.artworks[f.artworkId].status = 'storage';
+        park(state, f.artworkId);
+      }
       return;
     }
     case 'setPrice': {
@@ -104,15 +158,19 @@ function apply(state: GameState, action: Action): string | void {
     case 'studioVisit': {
       const artist = state.artists[action.artistId];
       if (!artist) return 'Unknown artist.';
-      if (artist.lastContactWeek === state.week && artist.relationship !== 0) return `You’ve already seen ${artist.name} this week.`;
+      if (artist.lastVisitDay === state.day) return `You’ve already visited ${artist.name} today.`;
       post(state, 'artist-care', -RULES.studioVisitCost, `Studio visit: ${artist.name}`);
       adjustRelationship(state, artist.id, RULES.studioVisitGain);
+      artist.lastVisitDay = state.day;
+      artist.studioVisits += 1;
+      wardOffRival(state, artist);
       return;
     }
     case 'scheduleEvent': {
       const cfg = EVENT_KIND[action.kind];
-      if (action.week < state.week + cfg.minWeeksAhead) return `Book a ${cfg.label.toLowerCase()} at least ${cfg.minWeeksAhead} week(s) ahead.`;
-      if (state.events.some((e) => e.week === action.week)) return 'You already have an event that week.';
+      if (action.day < state.day + cfg.minDaysAhead) return `Book a ${cfg.label.toLowerCase()} at least ${cfg.minDaysAhead} day(s) ahead.`;
+      if (state.events.some((e) => e.day === action.day)) return 'You already have an event that night.';
+      if (action.kind === 'auction' && hostedAuctionTooSoon(state, action.day)) return 'Collectors need a week between auction nights to consign new work.';
       const n = action.featuredArtistIds.length;
       if (n < cfg.minFeatured || n > cfg.maxFeatured) {
         return cfg.minFeatured === cfg.maxFeatured
@@ -130,14 +188,14 @@ function apply(state: GameState, action: Action): string | void {
       const event = {
         id: newId(state, 'e'),
         kind: action.kind,
-        week: action.week,
+        day: action.day,
         featuredArtistIds: [...action.featuredArtistIds],
         hospitality: { ...action.hospitality },
         cost: cost.total,
       };
       chargeEvent(state, event);
       state.events.push(event);
-      state.events.sort((a, b) => a.week - b.week);
+      state.events.sort((a, b) => a.day - b.day);
       return;
     }
     case 'cancelEvent': {
@@ -152,9 +210,73 @@ function apply(state: GameState, action: Action): string | void {
       state.budget = { art: Math.max(0, action.budget.art), hospitality: Math.max(0, action.budget.hospitality) };
       return;
     }
-    case 'advanceWeek': {
+    case 'setAutoHang': {
+      ensureStaff(state).autoHang = action.on;
+      return;
+    }
+    case 'signPatron':
+      return signPatron(state, action.artistId, action.tier);
+    case 'setStipend':
+      return setStipend(state, action.artistId, action.tier);
+    case 'endPatronage':
+      return endPatronage(state, action.artistId);
+    case 'mountExhibition': {
       const rng = new Rng(state.rng);
-      advanceWeek(state, rng);
+      const err = mountExhibition(state, action.theme, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'closeExhibition':
+      return closeExhibition(state, true);
+    case 'restockMerch': {
+      const cfg = MERCH[action.kind];
+      if (!cfg) return 'Unknown item.';
+      if (!(action.batches >= 1)) return 'Order at least one batch.';
+      const qty = Math.min(Math.floor(action.batches) * cfg.batch, shelfSpace(state, action.kind));
+      if (qty > 0 && state.cash - qty * cfg.unitCost < RULES.overdraftLimit) return 'You can’t afford that.';
+      return orderStock(state, action.kind, qty);
+    }
+    case 'setMerchPrice': {
+      const cfg = MERCH[action.kind];
+      if (!cfg) return 'Unknown item.';
+      const max = cfg.fairPrice * SHOP.maxPriceMultiple;
+      if (!(action.price >= 1) || action.price > max) return `Pick a price between $1 and $${max}.`;
+      state.shop.lines[action.kind].price = Math.round(action.price);
+      return;
+    }
+    case 'setAutoRestock': {
+      state.shop.autoRestock = action.on;
+      return;
+    }
+    case 'auctionBid':
+      return placeBid(state, action.lot);
+    case 'auctionPass':
+      return passLot(state, action.lot);
+    case 'hireStaff':
+      return hire(state, action.candidateId);
+    case 'letGoStaff':
+      return letGo(state, action.role);
+    case 'talkToArtist': {
+      const rng = new Rng(state.rng);
+      const err = beginTalk(state, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'talkChoose': {
+      const rng = new Rng(state.rng);
+      const err = chooseTalk(state, action.optionId, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'leaveTalk':
+      return leaveTalk(state);
+    case 'tick': {
+      const rng = new Rng(state.rng);
+      for (let i = 0; i < action.hours && state.status === 'playing'; i++) {
+        stepHour(state, rng);
+        // Marisol works hour by hour too, so a long skip still sees her clear the storeroom.
+        staffUpdate(state, absHour(state));
+      }
       state.rng = rng.state;
       return;
     }

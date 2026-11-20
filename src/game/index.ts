@@ -6,7 +6,34 @@ export { dispatch, type Action, type ActionResult } from './actions';
 export { saveGame, loadGame, clearSave } from './save';
 export { relationshipLabel } from './systems/artists';
 export { eventCost, expectedAttendance, hospitalityCost } from './systems/events';
-export { spentThisWeek } from './systems/ledger';
+export { spentThisWeek, weekOf } from './systems/ledger';
+export { clockLabel, weekday } from './clock';
 export { collectionAppeal, priceDemand } from './venues/museum';
 export { getVenueModel } from './venues';
-export { canPlace, fixtureAt, displayFixtures } from './systems/floor';
+export { canPlace, fixtureAt, displayFixtures, fitsOn } from './systems/floor';
+export { visitTimeline, poseAt, absHour, shortName, type Segment } from './systems/visits';
+export { moodAt, finalMood, moodWord, MOOD_AXES, MOOD_POLES } from './systems/moods';
+export { Steering, type Walker } from './systems/steering';
+export {
+  STAFF_ROLE_ORDER,
+  appraiserDiscount,
+  candidatesFor,
+  guardStops,
+  hired,
+  incidentChance,
+  salaryOf,
+  staffPoses,
+  staffPower,
+  weeklySalaries,
+  type StaffPose,
+} from './systems/staff';
+export { STAFF_CANDIDATES, type StaffCandidate } from '../data/staff';
+export { assistantPose, ASSISTANT, type AssistantPose } from './systems/assistant';
+export { buildReserve, planPlacement, shownOnFixture } from './systems/autohang';
+export { MERCH_KINDS, buyChance, merchAppeal, merchPriceDemand, shopCounter, takingsPerVisitor } from './systems/shop';
+export { tasteScore, reactionFor, workTags, TAG_LABEL } from './systems/taste';
+export { careerStage, potentialStars, isScouted, stageIndex, baseWorkValue } from './systems/careers';
+export { stipendFor, canSponsor, patronCount, signedWithRival, atRisk } from './systems/patronage';
+export { synergy, themeTitle, fitsTheme, exhibitionCost, liveScore, type Synergy, type SynergyBonus } from './systems/exhibitions';
+export { askingBid, withPremium, saleIsLive, nextSaleDay, hostedLots, hostedAuctionTooSoon } from './systems/auctions';
+export { callTimeline, callPrice, speakerName, toneScore, voiceOf } from './systems/artistCalls';

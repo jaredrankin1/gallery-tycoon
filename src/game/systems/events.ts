@@ -1,10 +1,17 @@
-import { CHEESE_PER_GUEST, DIFFICULTY, EVENT_KIND, FIXTURE_EFFECTS, WINE_PER_GUEST } from '../config';
+import { CAREER, CHEESE_PER_GUEST, DIFFICULTY, EVENT_KIND, FIXTURE_EFFECTS, SHOP, WINE_PER_GUEST } from '../config';
 import { countFixtures } from './floor';
 import { clamp, Rng } from '../rng';
 import type { EventResult, GameState, HospitalityPlan, ScheduledEvent } from '../types';
 import { getVenueModel } from '../venues';
 import { adjustRelationship } from './artists';
+import { addFame } from './careers';
+import { exhibitionEventBoost } from './exhibitions';
+import { notify } from './feed';
+import { eventGuests } from './visits';
 import { post } from './ledger';
+import { shopSales } from './shop';
+import { hostAuction } from './auctions';
+import { curatorEventBonus } from './staff';
 
 export function hospitalityCost(plan: HospitalityPlan): number {
   return plan.guests * (WINE_PER_GUEST[plan.wine] + CHEESE_PER_GUEST[plan.cheese]);
@@ -21,11 +28,11 @@ export function expectedAttendance(state: GameState, kind: ScheduledEvent['kind'
   const cfg = EVENT_KIND[kind];
   const fame = featuredArtistIds.reduce((s, id) => s + (state.artists[id]?.fame ?? 0), 0);
   return Math.round(
-    cfg.baseAttendance * DIFFICULTY[state.difficulty].demandMultiplier * (0.5 + state.reputation / 50) * (1 + fame / 100),
+    cfg.baseAttendance * DIFFICULTY[state.difficulty].demandMultiplier * (0.5 + state.reputation / 50) * (1 + fame / 100) * exhibitionEventBoost(state, featuredArtistIds),
   );
 }
 
-/** Resolves one event on its week. Mutates state and returns what happened. */
+/** Resolves one event on its evening. Mutates state and returns what happened. */
 export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng): EventResult {
   const cfg = EVENT_KIND[event.kind];
   const { wine, cheese, guests } = event.hospitality;
@@ -34,7 +41,7 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
   const coverage = clamp(guests / attendance, 0, 1);
   const quality = (wine + cheese) / 6;
   const barBonus = countFixtures(state.floor, 'bar') * FIXTURE_EFFECTS.barSatisfaction;
-  const satisfaction = wine + cheese === 0 ? 0.25 : clamp(coverage * (0.3 + 0.7 * quality) + barBonus, 0, 1);
+  const satisfaction = wine + cheese === 0 ? 0.25 : clamp(coverage * (0.3 + 0.7 * quality) + barBonus + curatorEventBonus(state), 0, 1);
 
   const reputationDelta = Math.round(cfg.prestige * (satisfaction - 0.4) * 2 * 10) / 10;
   state.reputation = clamp(state.reputation + reputationDelta, 0, 100);
@@ -71,15 +78,35 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
       }
     }
     relationshipDeltas[artistId] = adjustRelationship(state, artistId, delta);
+    // A good night out raises their profile.
+    addFame(state, artistId, cfg.prestige * CAREER.eventFame * satisfaction, 'the ' + cfg.short.toLowerCase());
   }
 
   const venue = getVenueModel(state.venue);
-  const { income, soldArtworkIds } = venue.onEvent(state, event, attendance, satisfaction, rng);
+  // An auction night earns its commission instead of the venue's usual takings.
+  const { income, soldArtworkIds } =
+    event.kind === 'auction'
+      ? (() => {
+          state.hostedAuctionDay = state.day;
+          return { income: hostAuction(state, attendance, satisfaction, rng).commission, soldArtworkIds: [] as string[] };
+        })()
+      : venue.onEvent(state, event, attendance, satisfaction, rng);
+  // Happy crowds browse the gift shop on the way out.
+  shopSales(state, rng, attendance, SHOP.eventSpend * (0.5 + satisfaction));
+
+  const verdict = satisfaction > 0.7 ? 'A triumph.' : satisfaction > 0.4 ? 'A pleasant evening.' : 'Guests left hungry.';
+  notify(state, {
+    kind: 'event',
+    text: `${EVENT_KIND[event.kind].label}: ${attendance} came, catered for ${guests}. ${verdict}`,
+  });
+  for (const n of notes) notify(state, { kind: 'artist', text: n });
+  eventGuests(state, event, satisfaction, rng, attendance);
+  state.today.visitors += attendance;
 
   return {
     eventId: event.id,
     kind: event.kind,
-    week: event.week,
+    day: event.day,
     attendance,
     catered: guests,
     satisfaction,
@@ -94,6 +121,6 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
 /** Charges the booking. Kept separate so cancellations can refund the same split. */
 export function chargeEvent(state: GameState, event: ScheduledEvent): void {
   const cost = eventCost(event.kind, event.hospitality);
-  post(state, 'events', -cost.base, `${EVENT_KIND[event.kind].label} booking (week ${event.week})`);
+  post(state, 'events', -cost.base, `${EVENT_KIND[event.kind].label} booking (day ${event.day})`);
   if (cost.hospitality > 0) post(state, 'hospitality', -cost.hospitality, `Wine & cheese for ${event.hospitality.guests}`);
 }

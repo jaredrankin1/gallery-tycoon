@@ -1,20 +1,16 @@
 import type { Rng } from '../rng';
 import type { GameState, Id, ScheduledEvent } from '../types';
 
-export interface WeeklyVenueResult {
-  visitors: number;
-  soldArtworkIds: Id[];
-  notes: string[];
-}
-
 /**
  * Strategy for how a venue earns money. Gallery and museum each implement it;
  * a new venue type (pop-up, auction house...) is one new file plus a registry entry.
  */
 export interface VenueModel {
-  /** Normal week of foot traffic. Posts its own ledger entries. */
-  weekly(state: GameState, rng: Rng): WeeklyVenueResult;
-  /** Extra revenue from an event on top of the normal week. */
+  /** One hour of normal trading. Posts its own ledger entries. Returns visitors this hour. */
+  hour(state: GameState, rng: Rng): number;
+  /** Expected visitors for a full day, for the HUD and the renderer's crowd size. */
+  expectedDailyVisitors(state: GameState): number;
+  /** Extra revenue from an event on top of normal trading. */
   onEvent(
     state: GameState,
     event: ScheduledEvent,

@@ -20,17 +20,47 @@ node scripts/build-single.mjs   # one self-contained HTML file in dist/
 
 ## The loop
 
-Each turn is one week:
+The first run is guided: you see the empty room right away, and Marisol (your
+gallery assistant) walks you through gallery or museum, where the money comes from,
+and the name, one choice at a time. The room behind updates as you pick.
 
-1. **Market**: buy works on offer. Artists who like you offer more and discount.
-2. **Floor**: hang works on wall spots or pedestals; build fixtures (wine bar, benches, plants) on the isometric grid.
-3. **Artists**: studio visits build relationships. Neglect cools them.
-4. **Events**: book openings, receptions, talks or galas weeks ahead. Pick the
-   featured artists, the wine tier, the cheese tier and how many guests to cater for.
-5. **Books**: weekly art and hospitality budgets vs. actual spend, ticket price (museum), ledger.
-6. **Next week**: sales or tickets come in, events resolve, rent and staff go out, and you get a wrap-up.
+The game runs on a continuous 24-hour clock, like other tycoon games: days just
+tick by. Each hour is one simulation step (about 1.6 seconds at 1x), and you can
+pause or play at 1x, 2x or 4x from the top bar. A new game starts at 10 AM.
+Footfall follows the time of day: busy afternoons, a trickle in the evening and
+almost nobody overnight, when the clock runs three times faster and the room
+goes dark.
 
-Run out of money past the overdraft and the doors close.
+- **Art**: buy works that turn up on the market each day. There are 40 real paintings across seven painters and 100 sculptures and fibre pieces across ten makers (geometric, organic, salvage, pop, brutalist, ceramic, fibre, vinyl toys, designer toys and classical marble). Sculpture stands on a pedestal; fibre wall hangings go on a wall spot, unframed. Artists who like you offer more often and give a discount.
+- **Floor**: tap a wall spot or pedestal to hang art, set its price (gallery) or take it down. Tap a painting on the wall to inspect it.
+- **Build**: wall spots, pedestals, a wine bar, benches and plants on the isometric grid, with a live placement preview.
+- **Marisol**, your gallery assistant, works the floor: dusting the art, talking visitors through pieces, clipboard rounds, greeting at the door. She cheers every sale and keeps watch by the door overnight.
+- **Auto-hang** (switch at the top of the Art sheet, on by default): Marisol places every new piece, bought or delivered, and works through anything else waiting in storage, one piece at a time whenever she's free. Wall pieces go on wall spots, sculpture on pedestals. She uses a free spot, else has one built if the floor has room and cash stays above a week of bills (rent, staff, upkeep and stipends, never less than $2,000), else swaps out the weakest piece of the same kind if the new one is worth more. Pieces you take down yourself stay in storage. You see her fetch it from the door, carry it over and put it up.
+- **Crowd**: every visitor the game counts walks in as a person, one for one. Members of the public wear recoloured outfits so they never pass for the named characters; the people icon in the top bar is exactly how many are on the floor right now. Events fill the room with their whole attendance.
+- **Visitors**: twelve named characters (collectors, critics, an influencer, students, a regular) walk in, look at what's hanging, and react with their own animations and lines. Each has hidden likes and dislikes you learn by watching. Collectors buy (gallery) or donate (museum), critics review, photographers and influencers bring buzz. Tap anyone on the floor to see what they're doing and thinking.
+- **Artist visits**: now and then (about every other day, and always once on day one) an artist walks in with one or two new pieces and waits on the floor under a yellow "!" marker. Tap them, or the "is here" card, to talk; the clock stops while you do. The chat runs like an RPG: greet them, say what you see in the work, then make a deal (buy one, buy both, haggle once, or pass). Each line has a tone (warm, wine, cheese, flattery, hype, business, process, blunt, and a right or wrong read of the work), and each artist takes tones differently according to their traits: a recluse wants to hear about process and hates hype, a diva wants flattery and hates haggling, the social ones want warmth and a drink. A good chat raises the relationship, and with a well-known artist it raises your reputation as they talk you up around town; a bad one costs both. Their prices are 15% under the dealer market (less again if they like you, or if you haggle well), and a great chat with someone you know well enough ends with the option to sponsor them. Ignore them for long enough and they leave, a little hurt. Visiting artists are never counted as visitors.
+- **Artists** (under People): studio visits build relationships, and neglect cools them. "Give a show" opens the event planner with that artist already picked.
+- **Patronage**: sponsor up to three artists on a weekly stipend (Modest, Fair or Generous). They deliver new work straight into storage at random intervals, and the stipend shapes how good it is (their *form*) and how loyal they stay. Underpaid or unhappy artists get courted by rival galleries: you get a week's warning to raise the stipend or win them back before they leave, and they're off the market for four weeks after. Artists also drift into new creative *phases* (moody, retro, fantasy...) that tag everything they make for a while. Sponsored artists' work stops appearing on the open market.
+- **Careers**: every artist has fame and a hidden *potential*. Fame rises with shows, sales and critics' reviews, and drifts toward potential (faster for artists you sponsor), with the odd breakout or flop. Two studio visits reveal an artist's potential as stars. A work's value follows its artist's fame, so a piece bought from an unknown can become the most valuable thing you own. Career stages (Unknown, Emerging, Established, Acclaimed, Blue-chip) are announced, and the Art sheet shows each work's gain or loss since you bought it.
+- **Exhibitions** (Events → Exhibition): pick a theme (a style tag such as "After Dark", or a solo show for one artist) and open a week-long show built from what's on the walls. Synergy scores how well the walls hang together: share of works on theme, depth, range of artists, a famous headliner, an unknown discovery, fresh work from your sponsored artists and strong pieces, minus repeats of a recent theme. Critics review it on opening day (reputation, and fame for the artists in it). While it runs, crowds rise, on-theme works sell faster, and events featuring its artists draw more people. Swapping pictures changes the live synergy.
+- **Events**: book an opening, reception, talk or gala on a future night. Choose featured artists, wine and cheese tiers, and how many guests to cater for. Events happen at 7 PM, with a crowd holding glasses on the floor.
+- **Books**: the last 14 days of income and spending, weekly art and wine & cheese budgets, the ticket price (museum), and the ledger.
+
+**Sound.** Crowd chatter rises and falls with how many people are on the floor
+(a couple of voices when it's quiet, a full room on a busy afternoon, near
+silence overnight), with a short gallery reverb. Named visitors ring the door
+bell, sales ring the till, cameras click, glasses clink at parties, and buttons
+tap. It's all synthesized in the browser (`src/audio/`), so there are no sound
+files. The speaker button in the top bar mutes it, and the choice is remembered.
+
+Sales, ticket money, events and artist reactions show up as toasts as they
+happen, and sales pop floating "+$" labels over the painting. Rent and staff
+are paid every Sunday night. If cash drops below the overdraft limit, the
+doors close.
+
+There is no closing time. Visitors who arrive late simply finish their visit
+after midnight and walk out the door, and party guests leave a few hours after
+the event starts.
 
 ## Layout
 
@@ -41,39 +71,64 @@ src/
     config.ts           Every tuning number: difficulty, venues, events, fixtures, rules
     state.ts            createNewGame()
     actions.ts          Action union + dispatch(state, action): the only way state changes
-    turn.ts             advanceWeek(): the weekly simulation order
+    clock.ts            stepHour(): the hourly simulation step and end-of-day work
     rng.ts              Seeded RNG, so runs and tests are reproducible
     save.ts             localStorage save/load (versioned)
     systems/
-      artists.ts        Relationships, neglect, fame drift, pricing hooks
+      artists.ts        Relationships, neglect, display exposure
+      artistCalls.ts    Artists dropping by: arrivals, the conversation, how each artist takes each tone
+      careers.ts        Fame, potential, career stages, work values that follow fame
+      patronage.ts      Stipends, deliveries, form, creative phases, rival galleries
+      exhibitions.ts    Themed shows: synergy scoring, opening reviews, crowd and sales boosts
       market.ts         Weekly art offers
       events.ts         Event costs, attendance, wine & cheese satisfaction, persona reactions
       floor.ts          Isometric floor plan: fixtures, placement rules, hanging
       ledger.ts         All cash moves through post(), with a category
+      feed.ts           notify(): things the player should hear about (toasts)
+      taste.ts          How a visitor feels about a work (likes, dislikes, fame, mood)
+      visits.ts         Visitor arrivals, visit plans, the shared walk timeline, outcomes
     venues/
       types.ts          VenueModel interface (how a venue earns money)
-      gallery.ts        Sales off the floor and at events
+      gallery.ts        Hourly sale rolls off the floor, and sales at events
       museum.ts         Ticket sales, collection appeal, price demand
-  data/artists.ts       Placeholder artist personas and artwork title parts
+  data/artists.ts       Artist personas (with style tags) and artwork title parts
+  data/artistTalk.ts    How each artist looks and sounds when they visit: sprite, greeting, voices, lines
+  data/paintings.ts     The painting catalogue: image, title, artist, extra style tags
+  data/sculptures.ts    The sculpture and fibre catalogue, with where each piece goes (form)
+  data/guests.ts        Visitor characters: role, tastes, budget, traits, lines
   render/
     iso.ts              Isometric projection math (grid <-> screen)
-    IsoRenderer.ts      Canvas renderer: walls, floor, fixtures, art, wandering visitors, tap-to-tile
-  ui/                   DOM screens (no framework), one panel per tab
+    IsoRenderer.ts      Canvas renderer: walls, floor, fixtures, art, animated visitors, tap targets
+    paintings.ts        Artwork images: paintings (tools/slice_art.py) and sculpture (tools/slice_sculpture.py)
+    sprites.ts          Sprite atlases and portraits (built by tools/slice_sprites.py)
+  ui/                   Preact UI
+    store.ts            Holds the game, runs the real-time clock, autosaves
+    Game.tsx            HUD, speed controls, dock, toasts, canvas wiring
+    Onboarding.tsx      Guided first run over the live room
+    GuestCard.tsx       Card for a visitor you tapped
+    ArtistTalk.tsx      The conversation with a visiting artist
+    Inspector.tsx       Card for whatever tile you tapped
+    BuildTray.tsx       Build mode
+    sheets/             Art, People (visitors + artists), Events, Books slide-up sheets
 tests/game.test.ts      Logic tests
 ```
 
 ## Extending it
 
 - **New artist**: add an entry to `src/data/artists.ts`. Give it `traits` and react to them in `systems/events.ts`.
+- **An artist's look**: each artist borrows a visitor sprite in a recolour, set in `ARTIST_TALK` in `src/data/artistTalk.ts`. To give an artist their own sprite, slice the sheet like a new visitor (below; it needs the visitor animations, at least `idle`, `walk` and `chat`, plus a `-portrait.png`), then set that artist's `look` to `{ sprite: '<name>', variant: 0 }`. Their greeting lives there too; everything else they say comes from their voice (picked from their traits).
 - **New event type**: add it to `EventKind` in `types.ts` and `EVENT_KIND` in `config.ts`.
 - **New fixture** (lighting, gift shop, coat check): add to `FixtureKind`, `FIXTURE`, draw it in `IsoRenderer.drawFixture`, and give it an effect in a system.
 - **New venue type**: implement `VenueModel` in `venues/` and register it in `venues/index.ts`.
 - **Balance**: almost everything is in `config.ts`.
-- **Art**: the renderer draws everything procedurally. Swap in sprites in `IsoRenderer` without touching game logic.
+- **New visitor**: drop a sprite sheet in `art/source/` (fixed grid layout) and run `python3 tools/slice_sprites.py`, or in `art/source/v2/` (free-form sheets) and point at each frame in `tools/slice_sprites_v2.py`, then run it. Run the v2 script after the first one, since the first rewrites `sprites.json`. Then add a seed to `src/data/guests.ts`.
+- **New painting**: add a card sheet to `art/source/paintings/`, run `python3 tools/slice_art.py`, and list each work in `src/data/paintings.ts`.
+- **New sculpture**: add a 5x2 sheet to `art/source/sculptures/`, add its name to `SHEETS` in `tools/slice_sculpture.py` (and to `NO_PLINTH` if the pieces have no plinth), run it, and list each piece in `src/data/sculptures.ts`.
+- **Art**: rooms are procedural; paintings and characters come from the sheets in `art/source/`.
 
 ## Design rules
 
-- The UI never mutates state; it sends an `Action` to `dispatch`.
+- The UI never mutates state; it sends an `Action` to `dispatch`. The clock is just a `tick` action sent on a timer, so tests can fast-forward days instantly.
 - Cash only changes through `ledger.post()`, so the books always add up.
 - The renderer only reads state. Visitors walking around are cosmetic.
 - Grid coordinates everywhere in logic; pixels only in `render/`.
