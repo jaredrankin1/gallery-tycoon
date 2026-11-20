@@ -22,6 +22,9 @@ import { crowdAtlas, preloadSprites, spriteScale, SPRITES } from './sprites';
 import { cutoutMotion, drawCutout } from './cutout';
 import { paintingImage, preloadPaintings } from './paintings';
 
+/** How far past the screen's width the room may be drawn (1 = fits exactly). */
+const ROOM_OVERFLOW = 1.14;
+
 /** Sculpture sprites are cut at this many times their size on the floor (for sharp zoom). */
 const SCULPTURE_SCALE = 2.8;
 import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
@@ -251,10 +254,14 @@ export class IsoRenderer {
     const fullH = this.canvas.clientHeight;
     const top = fullH * this.insets.top;
     const ch = fullH * (1 - this.insets.top - this.insets.bottom);
-    this.scale = Math.min(cw / (b.w + 16), ch / (b.h + 16));
+    // Fill the screen: the room may run a little past the sides (the far wall
+    // ends; drag to see them) rather than float small with empty space above.
+    this.scale = Math.min((cw * ROOM_OVERFLOW) / b.w, ch / (b.h + 16));
+    // Any spare height goes mostly below the room, not above it.
+    const spare = Math.max(0, ch - b.h * this.scale);
     this.origin = {
       x: cw / 2 - (b.left + b.w / 2) * this.scale,
-      y: top + ch / 2 - (b.top + b.h / 2) * this.scale,
+      y: top + spare * 0.3 - b.top * this.scale,
     };
   }
 
