@@ -28,7 +28,7 @@ export function rollGrade(artist: Artist, rng: Rng, spread = 0.35): number {
 /** Drops expired offers and adds up to `count` new ones (never above marketSize). */
 export function refreshMarket(state: GameState, rng: Rng, count: number = RULES.newOffersPerDay): void {
   for (const [id, work] of Object.entries(state.artworks)) {
-    if (work.status === 'offered' && work.day < state.day) delete state.artworks[id];
+    if (work.status === 'offered' && !work.withArtist && work.day < state.day) delete state.artworks[id];
   }
 
   // Artists who are angry with you won't sell to you. Friends show up more often.
@@ -38,7 +38,7 @@ export function refreshMarket(state: GameState, rng: Rng, count: number = RULES.
   const weighted = sellers.flatMap((a) => (a.relationship >= RULES.relationshipForOffers ? [a, a, a] : [a]));
 
   const diff = DIFFICULTY[state.difficulty];
-  let open = Object.values(state.artworks).filter((w) => w.status === 'offered').length;
+  let open = Object.values(state.artworks).filter((w) => w.status === 'offered' && !w.withArtist).length;
   for (let i = 0; i < count && open < RULES.marketSize; i++, open++) {
     const artist = rng.pick(weighted);
     const grade = rollGrade(artist, rng);

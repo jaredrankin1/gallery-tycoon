@@ -406,3 +406,41 @@ export const MOODS = {
   /** Walking pace varies person to person, as a multiple of GUESTS.walkTilesPerHour. */
   paceRange: [0.75, 1.2] as const,
 };
+
+// ---- Artist visits ---------------------------------------------------------------
+
+export const ARTIST_CALLS = {
+  /** Chance each daytime hour that an artist drops in, if none has today. About one visit every other day. */
+  hourlyChance: 0.08,
+  /** They arrive between these hours (ticks). */
+  hours: [10, 16] as [number, number],
+  /** On day one, someone always drops by from this hour, so you meet the idea early. */
+  firstVisitTick: 13,
+  /** How long they'll wait for you to come and talk, at most. */
+  waitHours: 8,
+  /** And never past this hour (9 PM). */
+  leaveByTick: 21,
+  walkHours: 0.6,
+  /** Buying straight from the artist: a share of what the dealers would ask. */
+  priceMultiple: 0.85,
+  twoWorksChance: 0.4,
+  /** Buying both pieces knocks this much off. */
+  pairCut: 0.1,
+  /** A successful haggle knocks this much off. */
+  haggleCut: 0.15,
+  /** Base odds a haggle works, before rapport and temperament. */
+  haggleBase: 0.4,
+  /** Relationship per point of rapport, before temperament. */
+  relationshipPerRapport: 2,
+  boughtBonus: 4,
+  /** Relationship lost if you leave them standing until they go. */
+  ignoredPenalty: 3,
+  /** Relationship lost if you walk off mid-conversation. */
+  walkAwayPenalty: 6,
+  /** Reputation: gained from this much rapport up, lost from this much down. */
+  repFrom: 3,
+  repLossFrom: -3,
+  repPerRapport: 0.5,
+  /** Artists this cold won't bother coming. */
+  minRelationship: -20,
+};

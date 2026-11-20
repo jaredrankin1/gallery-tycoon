@@ -8,6 +8,7 @@ import { Icon } from './icons';
 import { Inspector } from './Inspector';
 import { PeopleSheet } from './sheets/People';
 import { GuestCard } from './GuestCard';
+import { ArtistTalk, CallerFace } from './ArtistTalk';
 import { Onboarding } from './Onboarding';
 import { portraitUrl } from '../render/sprites';
 import { BooksSheet } from './sheets/Books';
@@ -35,7 +36,7 @@ const DOCK: { id: SheetId | 'build'; label: string; icon: string }[] = [
 
 export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store; onQuit: () => void; onboarding: boolean; onSetupDone: () => void }) {
   const state = useStore(store);
-  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', coach: false });
+  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', coach: false, talk: false });
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const setUi = useCallback((patch: Partial<Ui>) => setUiState((u) => ({ ...u, ...patch })), []);
@@ -87,6 +88,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
     }, (guestId) => {
       const u = uiRef.current;
       if (u.building) return;
+      if (guestId.startsWith('artist:')) return openTalkRef.current();
       setUi({ guest: u.guest === guestId ? null : guestId, selected: null, sheet: null });
     });
     r.setClock(() => absHour(store.state) + store.hourProgress);
@@ -142,7 +144,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
       else if (f.kind === 'event') sound.play('event');
       else if (f.kind === 'warn' || f.kind === 'bills') sound.play('warn');
       else if (f.kind === 'review' || f.kind === 'guest' || f.kind === 'delivery') sound.play('note');
-      const face = f.guestId ? state.guests[f.guestId]?.sprite : undefined;
+      const face = f.face ?? (f.guestId ? state.guests[f.guestId]?.sprite : undefined);
       const tone: Toast['tone'] =
         f.kind === 'sale' || f.kind === 'tickets' || f.kind === 'shop' ? 'sale' : f.kind === 'event' || f.kind === 'delivery' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
       toast(f.text, tone, face);
@@ -159,6 +161,23 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
     const t = setTimeout(() => setFlash(''), 450);
     return () => clearTimeout(t);
   }, [state.cash]);
+
+  // ---- talking to a visiting artist: the clock stops while you chat ----
+  const talkSpeed = useRef(1);
+  const openTalk = () => {
+    const call = store.state.artistCall;
+    if (!call || call.stage === 'done' || uiRef.current.talk) return;
+    talkSpeed.current = store.speedIndex || 1;
+    store.setSpeed(0);
+    setUi({ talk: true, sheet: null, building: false, build: null, selected: null, guest: null });
+  };
+  const openTalkRef = useRef(openTalk);
+  openTalkRef.current = openTalk;
+  const closeTalk = () => {
+    setUi({ talk: false });
+    store.setSpeed(talkSpeed.current);
+  };
+  const caller = state.artistCall && state.artistCall.stage !== 'done' ? state.artistCall : null;
 
   const [menu, setMenu] = useState(false);
   const wasSpeed = useRef(1);
@@ -263,7 +282,17 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
 
         {ui.selected && !ui.building && !ui.sheet && <Inspector />}
         {ui.guest && !ui.building && !ui.sheet && <GuestCard id={ui.guest} />}
-        {ui.coach && !ui.sheet && !ui.building && (
+        {caller && !ui.talk && !ui.sheet && !ui.building && !ui.selected && !ui.guest && (
+          <button class="caller-chip" onClick={openTalk}>
+            <CallerFace call={caller} />
+            <span>
+              <b>{state.artists[caller.artistId]?.name.split(' ')[0]} is here</b>
+              <small>{caller.stage === 'waiting' ? 'Brought new work · tap to talk' : 'Waiting for you'}</small>
+            </span>
+          </button>
+        )}
+        {ui.talk && <ArtistTalk onClose={closeTalk} />}
+        {ui.coach && !caller && !ui.sheet && !ui.building && (
           <div class="coach">
             <img src={portraitUrl(ASSISTANT.sprite)} alt="" />
             <p>Walls look bare, boss. Tap <b>Art</b> below to buy our first piece, then tap a wall spot and I’ll hang it.</p>

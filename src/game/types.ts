@@ -88,6 +88,8 @@ export interface Artwork {
   grade: number;
   /** Delivered by an artist you sponsor. */
   commissioned?: boolean;
+  /** Brought in by a visiting artist: only for sale while they're here, not on the dealer market. */
+  withArtist?: boolean;
 }
 
 // ---- Exhibitions: themed shows that run for a week -----------------------------
@@ -209,6 +211,8 @@ export interface FeedItem {
   at?: { x: number; y: number };
   /** Floating label and sound only, no toast (the gift shop's steady trickle of sales). */
   quiet?: boolean;
+  /** Sprite whose portrait to show on the toast (e.g. 'assistant' when Marisol tells you something). */
+  face?: string;
 }
 
 /** Player-set spending targets per week. Purely advisory for now; the books compare against them. */
@@ -410,6 +414,64 @@ export interface StaffState {
   jobs: HangJob[];
 }
 
+// ---- Artist visits: an artist drops by with work, and you talk ----------------
+
+/**
+ * The flavour of a line you say. How an artist takes each one depends on their
+ * traits (see TRAIT_TASTE in systems/artistCalls.ts).
+ */
+export type TalkTone =
+  | 'warm' | 'wine' | 'cheese' | 'flatter' | 'hype' | 'business' | 'process' | 'blunt'
+  | 'read' | 'misread' | 'buy' | 'haggle' | 'pass' | 'rudePass' | 'sponsor' | 'bye';
+
+export interface TalkOption {
+  id: string;
+  text: string;
+  tone: TalkTone;
+  /** The quality of the work this line names (reads of the work). */
+  tag?: string;
+  /** What you're buying, for a buy line. */
+  workIds?: Id[];
+}
+
+export interface TalkLine {
+  who: 'artist' | 'you';
+  text: string;
+  /** How they took what you said: -1 badly, 0 shrug, 1 well. */
+  feel?: -1 | 0 | 1;
+}
+
+export interface ArtistCall {
+  artistId: Id;
+  /** Which sprite sheet and recolour they appear as. */
+  look: { sprite: string; variant: number };
+  /** Absolute hours (see absHour). */
+  arrive: number;
+  /** If nobody talks to them by now, they leave. */
+  leaveBy: number;
+  /** When they head for the door, once it's over. */
+  leftAt?: number;
+  /** Where they stand and wait. */
+  at: { x: number; y: number };
+  faceLeft: boolean;
+  /** The pieces they brought (status 'offered', withArtist). */
+  workIds: Id[];
+  stage: 'waiting' | 'greet' | 'show' | 'deal' | 'farewell' | 'done';
+  /** Running score for how the chat is going. Each line adds -3..3. */
+  rapport: number;
+  /** What they just said. */
+  line: string;
+  /** What you can say next. */
+  options: TalkOption[];
+  log: TalkLine[];
+  haggled?: boolean;
+  /** Price cut agreed in haggling, 0..1. */
+  discount: number;
+  bought: Id[];
+  /** What it did for you, once it's over. */
+  result?: { relationship: number; reputation: number };
+}
+
 export interface GameState {
   version: 5;
   name: string;
@@ -448,6 +510,10 @@ export interface GameState {
   /** Seeded RNG state so a run is reproducible. */
   rng: number;
   nextId: number;
+  /** An artist in the building to show you work, if any. */
+  artistCall?: ArtistCall | null;
+  /** How many artists have dropped by, and the day the last one came (one a day at most). */
+  artistCalls?: { count: number; lastDay: number };
   /** Missing on older saves; see ensureStaff(). */
   staff?: StaffState;
   status: 'playing' | 'bankrupt';

@@ -8,7 +8,7 @@ export function CollectionSheet() {
   const owned = Object.values(state.artworks).filter((w) => w.status === 'storage' || w.status === 'display');
   const [tab, setTab] = useState<'market' | 'owned'>('market');
   const offers = Object.values(state.artworks)
-    .filter((w) => w.status === 'offered')
+    .filter((w) => w.status === 'offered' && !w.withArtist)
     .sort((a, b) => a.price - b.price);
   const canSell = getVenueModel(state.venue).canSell;
   const autoHang = !!state.staff?.autoHang;

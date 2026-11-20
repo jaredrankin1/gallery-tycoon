@@ -4,6 +4,7 @@ import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
 import { ensureStaff, park, staffUpdate, unpark } from './systems/autohang';
 import { closeExhibition, mountExhibition } from './systems/exhibitions';
+import { beginTalk, chooseTalk, leaveTalk } from './systems/artistCalls';
 import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/patronage';
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
@@ -40,6 +41,10 @@ export type Action =
   | { type: 'restockMerch'; kind: MerchKind; batches: number }
   | { type: 'setMerchPrice'; kind: MerchKind; price: number }
   | { type: 'setAutoRestock'; on: boolean }
+  /** Artist visits: walk over and talk, pick a line, or walk off. */
+  | { type: 'talkToArtist' }
+  | { type: 'talkChoose'; optionId: string }
+  | { type: 'leaveTalk' }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -64,7 +69,7 @@ function apply(state: GameState, action: Action): string | void {
   switch (action.type) {
     case 'buyArtwork': {
       const work = state.artworks[action.artworkId];
-      if (!work || work.status !== 'offered') return 'That work is no longer available.';
+      if (!work || work.status !== 'offered' || work.withArtist) return 'That work is no longer available.';
       if (state.cash - work.price < RULES.overdraftLimit) return 'You can’t afford that.';
       post(state, 'art', -work.price, `Bought "${work.title}"`);
       work.acquiredFor = work.price;
@@ -226,6 +231,20 @@ function apply(state: GameState, action: Action): string | void {
       state.shop.autoRestock = action.on;
       return;
     }
+    case 'talkToArtist': {
+      const rng = new Rng(state.rng);
+      const err = beginTalk(state, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'talkChoose': {
+      const rng = new Rng(state.rng);
+      const err = chooseTalk(state, action.optionId, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'leaveTalk':
+      return leaveTalk(state);
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) {

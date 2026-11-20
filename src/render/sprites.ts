@@ -120,3 +120,21 @@ export const portraitUrl = (name: string) => url(`${name}-portrait`);
 export function preloadSprites() {
   for (const name of Object.keys(SPRITES)) atlas(name);
 }
+
+const portraits = new Map<string, string>();
+
+/**
+ * A character's portrait in one of the crowd recolours, as an image URL, or
+ * null while it's still loading. Variant 0 is the original portrait.
+ */
+export function portraitFor(sprite: string, variant: number): string | null {
+  if (!variant) return portraitUrl(sprite);
+  const key = `${sprite}:${variant}`;
+  const hit = portraits.get(key);
+  if (hit) return hit;
+  const img = crowdAtlas(`${sprite}-portrait`, variant);
+  if (!img || !('toDataURL' in img)) return null;
+  const out = img.toDataURL();
+  portraits.set(key, out);
+  return out;
+}
