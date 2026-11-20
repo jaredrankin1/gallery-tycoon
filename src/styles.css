@@ -597,3 +597,7 @@ canvas.portrait { object-fit: contain; }
 .mission-later { background: none; border: 0; display: inline-flex; align-items: center; gap: 1cqw; font-size: 0.74em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0.6cqw 0; }
 .dock button.pulse { background: var(--yellow); }
 .mission.slim { padding-top: 1.6cqw; padding-bottom: 1.6cqw; }
+/* An artist showing you work: the whole piece, never cropped to a banner. */
+.talk-work .thumb.lg, .talk-works.n1 .talk-work .thumb.lg { height: auto; aspect-ratio: auto; display: flex; justify-content: center; }
+.talk-work .thumb.lg.img img { width: auto; max-width: 100%; height: auto; max-height: 56cqw; object-fit: contain; }
+.talk-works.n2 .talk-work .thumb.lg.img img { max-height: 40cqw; }
