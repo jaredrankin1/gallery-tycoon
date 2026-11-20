@@ -11,92 +11,113 @@ import {
   WINE_PER_GUEST,
   type EventKind,
   type HospitalityTier,
+  ASSISTANT,
+  buildReserve,
 } from '../../game';
-import { Avatar, money, Seg, Sheet } from '../bits';
+import { Avatar, money, Sheet } from '../bits';
 import { ExhibitionPanel } from './Exhibition';
 import { useGame, type EventDraft } from '../context';
 import { Icon } from '../icons';
 
 const TIERS: HospitalityTier[] = [0, 1, 2, 3];
 
-export function EventsSheet() {
+/** One week at a glance: the show, booked nights and the auction, then the details and Marisol's chores. */
+export function CalendarSheet() {
   const { state, ui, setUi, act } = useGame();
   const d = ui.draft;
 
-  const startDraft = () =>
-    setUi({ draft: { kind: 'opening', day: state.day + EVENT_KIND.opening.minDaysAhead, featured: [], hospitality: { wine: 2, cheese: 2, guests: 50 } } });
+  const startDraft = (day = state.day + EVENT_KIND.opening.minDaysAhead) =>
+    setUi({ draft: { kind: 'opening', day, featured: [], hospitality: { wine: 2, cheese: 2, guests: 50 } } });
 
   if (d) return <Planner draft={d} />;
 
-  const tabs = (
-    <Seg
-      options={[
-        { value: 'show', label: state.exhibition ? 'Exhibition · on' : 'Exhibition' },
-        { value: 'events', label: `Events (${state.events.length})` },
-      ]}
-      value={ui.eventsTab}
-      onPick={(v) => setUi({ eventsTab: v })}
-    />
-  );
-
-  if (ui.eventsTab === 'show') {
-    return (
-      <Sheet title="Shows & events" onClose={() => setUi({ sheet: null })}>
-        {tabs}
-        <ExhibitionPanel />
-      </Sheet>
-    );
-  }
+  const week = Array.from({ length: 7 }, (_, i) => state.day + i);
+  const ex = state.exhibition;
+  const firstBookable = state.day + EVENT_KIND.opening.minDaysAhead;
+  const autoHang = !!state.staff?.autoHang;
+  const autoRestock = !!state.shop?.autoRestock;
 
   return (
-    <Sheet
-      title="Shows & events"
-      onClose={() => setUi({ sheet: null })}
-      footer={
-        <button class="btn primary wide" onClick={startDraft}>
-          <Icon name="plus" size={16} /> Plan an event
-        </button>
-      }
-    >
-      {tabs}
-      {!state.events.length && (
-        <div class="empty">
-          <Icon name="events" size={36} />
-          <p>Nothing booked. Openings sell art and win artists over. Galas make your name.</p>
-        </div>
-      )}
-      <div class="list">
-        {state.events.map((e) => {
-          const inDays = e.day - state.day;
+    <Sheet title="This week" onClose={() => setUi({ sheet: null })}>
+      {ex && <div class="cal-show">Show: {ex.title} · runs to {weekday(ex.endDay)}</div>}
+      <div class="week">
+        {week.map((day) => {
+          const evs = state.events.filter((e) => e.day === day);
+          const sale = state.auction?.day === day;
+          const showing = ex && day >= ex.startDay && day <= ex.endDay;
+          const open = day >= firstBookable && !evs.length;
           return (
-            <div class="ticket">
-              <div class="ticket-date">
-                <small>{weekday(e.day)}</small>
-                <b>{inDays === 0 ? 'Tonight' : inDays === 1 ? 'Tmrw' : `${inDays}d`}</b>
-              </div>
-              <div class="grow">
-                <b>{EVENT_KIND[e.kind].label}</b>
-                <span class="faces">
-                  {e.featuredArtistIds.map((id) => (
-                    <Avatar artist={state.artists[id]} size="sm" />
-                  ))}
-                  <small class="muted">
-                    {e.kind === 'auction'
-                      ? `Collectors' consignments, ${Math.round(HOSTED_AUCTION.commission * 100)}% commission`
-                      : e.featuredArtistIds.map((id) => state.artists[id].name.split(' ')[0]).join(', ') || 'No featured artist'}
-                  </small>
-                </span>
-                <small class="muted">
-                  {TIER_LABEL[e.hospitality.wine]} wine · {TIER_LABEL[e.hospitality.cheese]} cheese · {e.hospitality.guests} guests
-                </small>
-              </div>
-              <button class="btn tiny ghost" onClick={() => act({ type: 'cancelEvent', eventId: e.id })}>
-                Cancel
-              </button>
-            </div>
+            <button class={`wk ${day === state.day ? 'today' : ''} ${showing ? 'showing' : ''}`} disabled={!open} onClick={() => startDraft(day)} aria-label={open ? `Plan an event on ${weekday(day)}` : weekday(day)}>
+              <b>{weekday(day).slice(0, 2)}</b>
+              {evs.map((e) => (
+                <i class="pill ev">{EVENT_KIND[e.kind].label.split(' ')[0]}</i>
+              ))}
+              {sale && <i class="pill sale">Sale</i>}
+              {open && <i class="wk-plus">+</i>}
+            </button>
           );
         })}
       </div>
+      <p class="hint">Tap a free day to plan an event there. Openings sell art and win artists over; galas make your name.</p>
+
+      {state.events.length > 0 && (
+        <div class="list">
+          {state.events.map((e) => {
+            const inDays = e.day - state.day;
+            return (
+              <div class="ticket">
+                <div class="ticket-date">
+                  <small>{weekday(e.day)}</small>
+                  <b>{inDays === 0 ? 'Tonight' : inDays === 1 ? 'Tmrw' : `${inDays}d`}</b>
+                </div>
+                <div class="grow">
+                  <b>{EVENT_KIND[e.kind].label}</b>
+                  <span class="faces">
+                    {e.featuredArtistIds.map((id) => (
+                      <Avatar artist={state.artists[id]} size="sm" />
+                    ))}
+                    <small class="muted">
+                      {e.kind === 'auction'
+                        ? `Collectors' consignments, ${Math.round(HOSTED_AUCTION.commission * 100)}% commission`
+                        : e.featuredArtistIds.map((id) => state.artists[id].name.split(' ')[0]).join(', ') || 'No featured artist'}
+                    </small>
+                  </span>
+                  <small class="muted">
+                    {TIER_LABEL[e.hospitality.wine]} wine · {TIER_LABEL[e.hospitality.cheese]} cheese · {e.hospitality.guests} guests
+                  </small>
+                </div>
+                <button class="btn tiny ghost" onClick={() => act({ type: 'cancelEvent', eventId: e.id })}>
+                  Cancel
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <button class="btn primary wide gap-top" onClick={() => startDraft()}>
+        <Icon name="plus" size={16} /> Plan an event
+      </button>
+
+      <h3 class="section">{ex ? 'Now showing' : 'Put on a show'}</h3>
+      <ExhibitionPanel />
+
+      <h3 class="section">{ASSISTANT.name} handles it</h3>
+      <button class={`autohang ${autoHang ? 'on' : ''}`} role="switch" aria-checked={autoHang} onClick={() => act({ type: 'setAutoHang', on: !autoHang })}>
+        <span class="grow">
+          <b>Hang new art</b>
+          <small class="muted">
+            {autoHang ? `Puts new pieces on free walls, builds a spot while cash stays above ${money(buildReserve(state))}, swaps out weaker work.` : 'Off: new pieces wait in storage for you.'}
+          </small>
+        </span>
+        <span class="knob" aria-hidden="true" />
+      </button>
+      <button class={`autohang ${autoRestock ? 'on' : ''}`} role="switch" aria-checked={autoRestock} onClick={() => act({ type: 'setAutoRestock', on: !autoRestock })}>
+        <span class="grow">
+          <b>Restock the gift shop</b>
+          <small class="muted">{autoRestock ? 'Reorders anything running low overnight.' : 'Off: order stock yourself from the counter.'}</small>
+        </span>
+        <span class="knob" aria-hidden="true" />
+      </button>
     </Sheet>
   );
 }

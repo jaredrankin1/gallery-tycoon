@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { ASSISTANT, absHour, canPlace, clockLabel, fixtureAt, TIME, VENUE, weekday, type Action } from '../game';
+import { ASSISTANT, absHour, canPlace, clockLabel, EVENT_KIND, fixtureAt, TIME, VENUE, weekday, type Action } from '../game';
 import { IsoRenderer } from '../render/IsoRenderer';
 import { shortMoney } from './bits';
 import { BuildTray } from './BuildTray';
@@ -15,7 +15,8 @@ import { portraitUrl } from '../render/sprites';
 import { BooksSheet } from './sheets/Books';
 import { ShopSheet } from './sheets/Shop';
 import { CollectionSheet } from './sheets/Collection';
-import { EventsSheet } from './sheets/Events';
+import { CalendarSheet } from './sheets/Events';
+import { InboxSheet } from './sheets/Inbox';
 import { useStore, type Store } from './store';
 import { sound } from '../audio/sound';
 
@@ -27,17 +28,30 @@ interface Toast {
   face?: string;
 }
 
+/** Four buttons, no sub-tabs. People open from the inbox or the floor, the books from the cash, the shop from its counter. */
 const DOCK: { id: SheetId | 'build'; label: string; icon: string }[] = [
   { id: 'build', label: 'Build', icon: 'build' },
   { id: 'collection', label: 'Art', icon: 'art' },
-  { id: 'people', label: 'People', icon: 'artists' },
-  { id: 'events', label: 'Events', icon: 'events' },
-  { id: 'books', label: 'Books', icon: 'books' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+  { id: 'inbox', label: 'Inbox', icon: 'inbox' },
 ];
+
+/** Sheets cover this much of the screen; the room slides up into the rest. */
+const SHEET_H = 0.56;
 
 export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store; onQuit: () => void; onboarding: boolean; onSetupDone: () => void }) {
   const state = useStore(store);
-  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', talk: false });
+  const [ui, setUiState] = useState<Ui>({
+    sheet: null,
+    build: null,
+    building: false,
+    selected: null,
+    draft: null,
+    guest: null,
+    peopleTab: 'guests',
+    artTab: 'market',
+    talk: false,
+  });
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const setUi = useCallback((patch: Partial<Ui>) => setUiState((u) => ({ ...u, ...patch })), []);
@@ -68,30 +82,34 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
   /** People on the floor right now, as drawn: the HUD count is exactly who you can see. */
   const [inside, setInside] = useState(0);
   useEffect(() => {
-    const r = new IsoRenderer(canvasRef.current!, (x, y) => {
-      const u = uiRef.current;
-      const s = store.state;
-      if (u.building) {
-        if (!u.build) return toast('Pick something from the tray first.', 'error');
-        if (u.build === 'remove') {
-          const f = fixtureAt(s.floor, x, y);
-          if (f) act({ type: 'removeFixture', fixtureId: f.id });
+    const r = new IsoRenderer(
+      canvasRef.current!,
+      (x, y) => {
+        const u = uiRef.current;
+        const s = store.state;
+        if (u.building) {
+          if (!u.build) return toast('Pick something from the tray first.', 'error');
+          if (u.build === 'remove') {
+            const f = fixtureAt(s.floor, x, y);
+            if (f) act({ type: 'removeFixture', fixtureId: f.id });
+            return;
+          }
+          const err = canPlace(s.floor, u.build, x, y);
+          if (err) toast(err, 'error');
+          else act({ type: 'placeFixture', kind: u.build, x, y });
           return;
         }
-        const err = canPlace(s.floor, u.build, x, y);
-        if (err) toast(err, 'error');
-        else act({ type: 'placeFixture', kind: u.build, x, y });
-        return;
-      }
-      if (u.sheet) return setUi({ sheet: null });
-      const same = u.selected && u.selected.x === x && u.selected.y === y;
-      setUi({ selected: same ? null : { x, y }, guest: null });
-    }, (guestId) => {
-      const u = uiRef.current;
-      if (u.building) return;
-      if (guestId.startsWith('artist:')) return openTalkRef.current();
-      setUi({ guest: u.guest === guestId ? null : guestId, selected: null, sheet: null });
-    });
+        if (u.sheet) return setUi({ sheet: null });
+        const same = u.selected && u.selected.x === x && u.selected.y === y;
+        setUi({ selected: same ? null : { x, y }, guest: null });
+      },
+      (guestId) => {
+        const u = uiRef.current;
+        if (u.building) return;
+        if (guestId.startsWith('artist:')) return openTalkRef.current();
+        setUi({ guest: u.guest === guestId ? null : guestId, selected: null, sheet: null });
+      },
+    );
     r.setClock(() => absHour(store.state) + store.hourProgress);
     r.setOnCount(setInside);
     r.setOnSfx((k) => sound.play(k));
@@ -113,7 +131,8 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
     r.setSelected(ui.building ? null : ui.selected);
     r.setSelectedGuest(ui.guest);
     if (onboarding) r.setInsets(0.1, 0.5);
-    else r.setInsets(0.17, 0.11);
+    else if (ui.sheet) r.setInsets(0.12, SHEET_H);
+    else r.setInsets(0.12, 0.1);
     r.setBuildKind(ui.building && ui.build && ui.build !== 'remove' ? ui.build : null);
   });
 
@@ -147,10 +166,30 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
       else if (f.kind === 'review' || f.kind === 'guest' || f.kind === 'delivery') sound.play('note');
       const face = f.face ?? (f.guestId ? state.guests[f.guestId]?.sprite : undefined);
       const tone: Toast['tone'] =
-        f.kind === 'sale' || f.kind === 'tickets' || f.kind === 'shop' ? 'sale' : f.kind === 'event' || f.kind === 'delivery' ? 'event' : f.kind === 'review' ? 'review' : f.kind === 'guest' ? 'guest' : f.kind === 'warn' || f.kind === 'bills' ? 'warn' : 'info';
+        f.kind === 'sale' || f.kind === 'tickets' || f.kind === 'shop'
+          ? 'sale'
+          : f.kind === 'event' || f.kind === 'delivery'
+            ? 'event'
+            : f.kind === 'review'
+              ? 'review'
+              : f.kind === 'guest'
+                ? 'guest'
+                : f.kind === 'warn' || f.kind === 'bills'
+                  ? 'warn'
+                  : 'info';
       toast(f.text, tone, face);
     }
   }, [state.feedSeq, onboarding]);
+
+  // ---- inbox: news since you last looked ----
+  const [readSeq, setReadSeq] = useState(state.feedSeq);
+  useEffect(() => {
+    if (ui.sheet === 'inbox') setReadSeq(state.feedSeq);
+  }, [ui.sheet, state.feedSeq]);
+  useEffect(() => {
+    if (onboarding) setReadSeq(state.feedSeq);
+  }, [onboarding]);
+  const unread = state.feed.filter((f) => !f.quiet && f.id > readSeq).length;
 
   // ---- cash flash ----
   const lastCash = useRef(state.cash);
@@ -193,9 +232,27 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
   const dayFraction = (state.tick + store.hourProgress) / TIME.ticksPerDay;
 
   const openDock = (id: SheetId | 'build') => {
-    if (id === 'build') setUi({ building: !ui.building, build: null, sheet: null, selected: null, guest: null });
-    else setUi({ sheet: ui.sheet === id ? null : id, building: false, build: null, selected: null, guest: null });
+    if (id === 'build') setUi({ building: !ui.building, build: null, sheet: null, selected: null, guest: null, draft: null });
+    else
+      setUi({
+        sheet: ui.sheet === id ? null : id,
+        building: false,
+        build: null,
+        selected: null,
+        guest: null,
+        draft: null,
+        // The art sheet opens on the auction on sale day.
+        ...(id === 'collection' && ui.sheet !== id ? { artTab: state.auction?.day === state.day ? 'auction' : ui.artTab } : {}),
+      });
   };
+  const sheetFor = (id: SheetId) => ui.sheet === id || (id === 'inbox' && (ui.sheet === 'people' || ui.sheet === 'books' || ui.sheet === 'shop'));
+
+  // One card floats over the room at a time: what you tapped, else a visiting artist, else Marisol's task.
+  const free = !ui.talk && !ui.sheet && !ui.building;
+  const card: 'inspect' | 'guest' | 'caller' | null = !free ? null : ui.selected ? 'inspect' : ui.guest ? 'guest' : caller ? 'caller' : null;
+  const latest = toasts[toasts.length - 1];
+  const fast = store.speedIndex > 1;
+  const paused = store.speedIndex === 0;
 
   if (onboarding) {
     return (
@@ -223,95 +280,104 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
             <button class="venue-name" onClick={openMenu} title="Menu">
               <b>{state.name}</b>
               <small>
-                {VENUE[state.venue].label} · {weekday(state.day)}, day {state.day}
+                <span class="dayring" style={{ '--p': dayFraction }} />
+                {weekday(state.day).slice(0, 3)} {state.day} · {clockLabel(state.tick)} · <Icon name="star" size={11} />
+                {Math.round(state.reputation)} · <Icon name="people" size={11} />
+                {inside}
               </small>
             </button>
-            <div class={`cash ${flash}`}>
-              <small>Cash</small>
-              <b>{shortMoney(state.cash)}</b>
-            </div>
-          </div>
-          <div class="hud-row">
-            <div class="clock">
-              <span class="dayring" style={{ '--p': dayFraction }} />
-              <b>{clockLabel(state.tick)}</b>
-              {tonight ? (
-                <span class="tonight">{tonight.kind} tonight</span>
-              ) : (
-                state.exhibition && (
-                  <button class="tonight show-chip" onClick={() => setUi({ sheet: 'events', eventsTab: 'show', building: false, selected: null, guest: null })}>
-                    {state.exhibition.title}
-                  </button>
-                )
-              )}
-            </div>
-            <div class="chips-mini">
-              <span class="mini" title="Reputation">
-                <Icon name="star" size={14} />
-                {Math.round(state.reputation)}
-              </span>
-              <span class="mini" title={`In the building now · ${state.today.visitors} today`}>
-                <Icon name="people" size={14} />
-                {inside}
-              </span>
-              <SoundToggle />
-            </div>
             <div class="speed" role="group" aria-label="Game speed">
-              {TIME.speeds.map((sp, i) => (
-                <button class={store.speedIndex === i ? 'on' : ''} onClick={() => store.setSpeed(i)} aria-label={sp ? `${sp}x speed` : 'Pause'}>
-                  <Icon name={sp === 0 ? 'pause' : sp === 1 ? 'play1' : sp === 2 ? 'play2' : 'play3'} size={16} />
-                </button>
-              ))}
+              <button class={paused ? 'on' : ''} onClick={() => store.setSpeed(paused ? 1 : 0)} aria-label={paused ? 'Play' : 'Pause'}>
+                <Icon name={paused ? 'play1' : 'pause'} size={16} />
+              </button>
+              <button
+                class={fast ? 'on' : ''}
+                onClick={() => store.setSpeed(store.speedIndex >= TIME.speeds.length - 1 ? 1 : Math.max(2, store.speedIndex + 1))}
+                aria-label={`Fast forward (now ${TIME.speeds[store.speedIndex]}x)`}
+              >
+                <Icon name={store.speedIndex === 3 ? 'play3' : 'play2'} size={16} />
+              </button>
             </div>
+            <SoundToggle />
+            <button
+              class={`cash ${flash} ${tutorialPulse(state, ui) === 'books' ? 'pulse' : ''}`}
+              onClick={() => setUi({ sheet: ui.sheet === 'books' ? null : 'books', building: false, build: null, selected: null, guest: null, draft: null })}
+              title="Books"
+            >
+              <b>{shortMoney(state.cash)}</b>
+            </button>
           </div>
+          <button class={`ticker ${latest ? `has-news t-${latest.tone}` : ''}`} key={latest?.id ?? 0} onClick={() => openDock('inbox')} aria-live="polite">
+            {latest ? (
+              <>
+                {latest.face ? <img class="ticker-face" src={portraitUrl(latest.face)} alt="" /> : <i class="ticker-dot" />}
+                <span class="ticker-text">{latest.text}</span>
+              </>
+            ) : paused && state.status === 'playing' ? (
+              <>
+                <i class="ticker-dot" />
+                <span class="ticker-text">Paused · tap ▶ to resume</span>
+              </>
+            ) : (
+              <>
+                <i class="ticker-dot calm" />
+                <span class="ticker-text">
+                  {tonight
+                    ? `${EVENT_KIND[tonight.kind].label} tonight`
+                    : state.exhibition
+                      ? `Now showing: ${state.exhibition.title}`
+                      : `${VENUE[state.venue].label} open`}
+                </span>
+              </>
+            )}
+            {unread > 0 && <span class="ticker-more">{unread} new ›</span>}
+          </button>
         </header>
 
-        <div class="toasts" aria-live="polite">
-          {toasts.map((t) => (
-            <div key={t.id} class={`toast ${t.tone}`}>
-              {t.face && <img class="toast-face" src={portraitUrl(t.face)} alt="" />}
-              <span>{t.text}</span>
-            </div>
-          ))}
-        </div>
-
-        {store.speedIndex === 0 && state.status === 'playing' && (
-          <button class="paused" onClick={() => store.setSpeed(1)}>
-            Paused · tap to resume
-          </button>
-        )}
-
-        {ui.selected && !ui.building && !ui.sheet && <Inspector />}
-        {ui.guest && !ui.building && !ui.sheet && <GuestCard id={ui.guest} />}
-        {caller && !ui.talk && !ui.sheet && !ui.building && !ui.selected && !ui.guest && (
-          <button class="caller-chip" onClick={openTalk}>
+        {card === 'inspect' && <Inspector />}
+        {card === 'guest' && <GuestCard id={ui.guest!} />}
+        {card === 'caller' && caller && (
+          <div class="caller-card">
             <CallerFace call={caller} />
-            <span>
-              <b>{state.artists[caller.artistId]?.name.split(' ')[0]} is here</b>
-              <small>{caller.stage === 'waiting' ? 'Brought new work · tap to talk' : 'Waiting for you'}</small>
+            <span class="grow">
+              <b>
+                {state.artists[caller.artistId]?.name.split(' ')[0]} {caller.stage === 'waiting' ? 'dropped by' : 'is waiting'}
+              </b>
+              <small>{caller.stage === 'waiting' ? 'Brought new work to show you' : 'Still hoping to talk'}</small>
             </span>
-          </button>
+            <button class="btn primary" onClick={openTalk}>
+              Talk
+            </button>
+          </div>
         )}
         {ui.talk && <ArtistTalk onClose={closeTalk} />}
-        {!ui.talk && <TutorialCard low={!caller && !ui.sheet && !ui.building && !ui.selected && !ui.guest} />}
+        {!ui.talk && <TutorialCard low={free && !card} slim={!!card || ui.building} />}
         {ui.building && <BuildTray />}
 
         {ui.sheet === 'collection' && <CollectionSheet />}
+        {ui.sheet === 'calendar' && <CalendarSheet />}
+        {ui.sheet === 'inbox' && <InboxSheet onTalk={openTalk} />}
         {ui.sheet === 'people' && <PeopleSheet />}
-        {ui.sheet === 'events' && <EventsSheet />}
         {ui.sheet === 'books' && <BooksSheet />}
         {ui.sheet === 'shop' && <ShopSheet />}
 
         <nav class="dock">
           {DOCK.map((d) => {
             const pulse = tutorialPulse(state, ui);
-            const on = d.id === 'build' ? ui.building : ui.sheet === d.id || (d.id === 'books' && ui.sheet === 'shop');
-            const badge = d.id === 'events' ? state.events.length + (state.exhibition ? 1 : 0) : d.id === 'collection' ? Object.values(state.artworks).filter((w) => w.status === 'storage').length : 0;
+            const on = d.id === 'build' ? ui.building : sheetFor(d.id);
+            const badge =
+              d.id === 'inbox'
+                ? unread
+                : d.id === 'calendar'
+                  ? state.events.length
+                  : d.id === 'collection'
+                    ? Object.values(state.artworks).filter((w) => w.status === 'storage').length
+                    : 0;
             return (
               <button class={`${on ? 'on' : ''} ${pulse === d.id ? 'pulse' : ''}`} onClick={() => openDock(d.id)}>
                 <span class="dock-icon">
                   <Icon name={d.icon} />
-                  {badge > 0 && <i class="badge">{badge}</i>}
+                  {badge > 0 && <i class={`badge ${d.id === 'inbox' ? 'hot' : ''}`}>{badge > 9 ? '9+' : badge}</i>}
                 </span>
                 <small>{d.label}</small>
               </button>
@@ -320,11 +386,23 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
         </nav>
 
         {menu && (
-          <div class="modal" onClick={() => { setMenu(false); store.setSpeed(wasSpeed.current); }}>
+          <div
+            class="modal"
+            onClick={() => {
+              setMenu(false);
+              store.setSpeed(wasSpeed.current);
+            }}
+          >
             <div class="modal-card" onClick={(e) => e.stopPropagation()}>
               <h2>{state.name}</h2>
               <p class="muted">Paused. Your game saves automatically.</p>
-              <button class="btn primary wide" onClick={() => { setMenu(false); store.setSpeed(wasSpeed.current); }}>
+              <button
+                class="btn primary wide"
+                onClick={() => {
+                  setMenu(false);
+                  store.setSpeed(wasSpeed.current);
+                }}
+              >
                 Resume
               </button>
               {state.tutorial?.status !== 'on' && (

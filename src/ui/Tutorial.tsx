@@ -113,7 +113,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     task: 'Check the auction',
     say: (v) =>
       v.ui.sheet === 'collection' ? (
-        <>The <b>Auction</b> tab shows this week’s lots. Bids go up live on sale day, and you can find real bargains. Or host an auction night here yourself, from Events.</>
+        <>The <b>Auction</b> tab shows this week’s lots. Bids go up live on sale day, and you can find real bargains. Or host an auction night yourself, from the Calendar.</>
       ) : (
         <>Cheaper art turns up at auction once a week. Tap <b>Art</b>, then the <b>Auction</b> tab, to see what’s coming.</>
       ),
@@ -125,7 +125,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     task: 'Talk to an artist',
     say: (v) =>
       v.state.artistCall && v.state.artistCall.stage !== 'done' ? (
-        <>Someone’s at the door with a portfolio. Tap the chip up top and talk to them. Say what they like to hear and you’ll get a better price, and a friend.</>
+        <>Someone’s at the door with a portfolio. Tap <b>Talk</b> on their card. Say what they like to hear and you’ll get a better price, and a friend.</>
       ) : (
         <>Artists drop by with new work every few days, and sell for less than the dealers. When one turns up, tap them to talk. Charm counts.</>
       ),
@@ -140,16 +140,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'event',
     task: 'Plan an event',
     say: (v) =>
-      v.ui.sheet === 'events' ? (
+      v.ui.sheet === 'calendar' ? (
         v.ui.draft ? (
           <>Pick a night, the wine and the cheese, and how many to invite. Good food keeps guests happy; empty glasses send them home. Then <b>Book it</b>.</>
         ) : (
-          <>Mount a themed <b>show</b> from what’s on the walls, or switch to <b>Events</b> and tap <b>Plan an event</b> for an opening night. Either brings in collectors and critics.</>
+          <>Tap a free day (or <b>Plan an event</b>) for an opening night, or scroll down to put on a themed <b>show</b>. Either brings in collectors and critics.</>
         )
       ) : (
-        <>Parties sell art. Tap <b>Events</b> and plan an opening night, or put on a themed show.</>
+        <>Parties sell art. Tap <b>Calendar</b> and plan an opening night, or put on a themed show.</>
       ),
-    pulse: (v) => (v.ui.sheet === 'events' ? null : 'events'),
+    pulse: (v) => (v.ui.sheet === 'calendar' ? null : 'calendar'),
     done: (v, b) => measure(v.state).booked > b.booked,
   },
   {
@@ -160,12 +160,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         v.ui.peopleTab === 'staff' ? (
           <>A guard stops theft, an appraiser haggles dealers down, a curator makes shows land, and an intern is cheap help. Wages go out with the weekly bills.</>
         ) : (
-          <>Open the <b>Staff</b> tab. One hire per job, so choose well.</>
+          <>Tap <b>Staff</b>. One hire per job, so choose well.</>
         )
+      ) : v.ui.sheet === 'inbox' ? (
+        <>Under <b>Your people</b>, tap <b>Staff</b> to see who’s applied.</>
       ) : (
-        <>I can’t do everything myself. Tap <b>People</b> and look at who’s applied. Even one hire helps.</>
+        <>I can’t do everything myself. Tap <b>Inbox</b>, then <b>Staff</b>, and look at who’s applied. Even one hire helps.</>
       ),
-    pulse: (v) => (v.ui.sheet === 'people' ? null : 'people'),
+    pulse: (v) => (v.ui.sheet === 'people' || v.ui.sheet === 'inbox' ? null : 'inbox'),
     done: (v, b) => measure(v.state).staff > b.staff,
   },
   {
@@ -176,14 +178,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         v.ui.sheet === 'shop' ? (
           <>Postcards, prints, keychains, t-shirts. Order stock and set prices here; everyone who walks past might buy something.</>
         ) : (
-          <>The counter’s up. Tap it on the floor (or <b>Books</b>, then <b>Gift shop</b>) to stock the shelves.</>
+          <>The counter’s up. Tap it on the floor to stock the shelves.</>
         )
       ) : v.ui.building ? (
         <>Pick the <b>Gift shop</b> counter from the tray and put it near the door.</>
       ) : (
         <>Not everyone buys a painting, but everyone buys a postcard. Tap <b>Build</b> and put in a gift shop counter.</>
       ),
-    pulse: (v) => (measure(v.state).shops > 0 ? (v.ui.sheet === 'shop' ? null : 'books') : v.ui.building ? null : 'build'),
+    pulse: (v) => (measure(v.state).shops > 0 ? null : v.ui.building ? null : 'build'),
     done: (v, b) => measure(v.state).shops > b.shops || (b.shops > 0 && v.ui.sheet === 'shop'),
   },
   {
@@ -193,15 +195,18 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       v.ui.sheet === 'books' ? (
         <>Money in, money out, and when the bills land. Keep an eye on that number and we’ll do fine.</>
       ) : (
-        <>Last one. Tap <b>Books</b> so you know where the money goes. Rent and wages go out every week.</>
+        <>Last one. Tap your <b>cash</b>, top right, to open the books. Rent and wages go out every week.</>
       ),
     pulse: (v) => (v.ui.sheet === 'books' ? null : 'books'),
     done: (v) => v.ui.sheet === 'books',
   },
 ];
 
-/** Marisol's task card. Sits above the dock, or under the HUD while a sheet is open. */
-export function TutorialCard({ low }: { low: boolean }) {
+/**
+ * Marisol's task card. Sits above the dock when nothing else is up; under the top bar while a
+ * sheet is open; just its title line (slim) while another card or the build tray has the floor.
+ */
+export function TutorialCard({ low, slim = false }: { low: boolean; slim?: boolean }) {
   const { state, ui, act } = useGame();
   const t = state.tutorial;
   const at = t?.step ?? 0;
@@ -220,7 +225,7 @@ export function TutorialCard({ low }: { low: boolean }) {
 
   if (!step) return null;
   return (
-    <div class={`mission ${low ? 'low' : 'high'} ${ui.building ? 'slim' : ''} ${finished ? 'ticked' : ''}`} key={step.id}>
+    <div class={`mission ${low ? 'low' : 'high'} ${slim ? 'slim' : ''} ${finished ? 'ticked' : ''}`} key={step.id}>
       <div class="mission-head">
         <span class="mission-tag">Opening week · {at + 1}/{TUTORIAL_STEPS.length}</span>
         <b>{finished ? '✓ ' : ''}{step.task}</b>
@@ -229,11 +234,11 @@ export function TutorialCard({ low }: { low: boolean }) {
         </button>
       </div>
       {/* While building, just the task: the tray has the how-to, and the walls need to stay visible. */}
-      {(!ui.building || finished) && <div class="mission-body">
+      {(!slim || finished) && <div class="mission-body">
         <img src={portraitUrl(ASSISTANT.sprite)} alt="" />
         <p>{finished ? 'Perfect. That’s exactly it.' : step.say(v)}</p>
       </div>}
-      {!finished && !ui.building && (
+      {!finished && !slim && (low || step.gotIt) && (
         <div class="mission-foot">
           <span class="mission-bar">
             {TUTORIAL_STEPS.map((_, i) => (

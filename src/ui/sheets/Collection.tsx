@@ -1,5 +1,4 @@
-import { useState } from 'preact/hooks';
-import { ASSISTANT, buildReserve, getVenueModel, RULES } from '../../game';
+import { getVenueModel, RULES } from '../../game';
 import { ArtThumb, Avatar, money, Seg, Sheet, shortMoney } from '../bits';
 import { AuctionPanel } from './Auction';
 import { useGame } from '../context';
@@ -7,9 +6,10 @@ import { useGame } from '../context';
 const SOURCE = { personal: 'your collection', family: 'family collection', auction: 'from auction' } as const;
 
 export function CollectionSheet() {
-  const { state, setUi, act, toast } = useGame();
+  const { state, ui, setUi, act, toast } = useGame();
   const owned = Object.values(state.artworks).filter((w) => w.status === 'storage' || w.status === 'display');
-  const [tab, setTab] = useState<'market' | 'auction' | 'owned'>(state.auction?.day === state.day ? 'auction' : 'market');
+  const tab = ui.artTab;
+  const setTab = (artTab: typeof tab) => setUi({ artTab });
   const live = state.auction?.day === state.day;
   const offers = Object.values(state.artworks)
     .filter((w) => w.status === 'offered' && !w.withArtist)
@@ -29,17 +29,6 @@ export function CollectionSheet() {
         onPick={setTab}
       />
 
-      <button class={`autohang ${autoHang ? 'on' : ''}`} role="switch" aria-checked={autoHang} onClick={() => act({ type: 'setAutoHang', on: !autoHang })}>
-        <span class="grow">
-          <b>{ASSISTANT.name} hangs art</b>
-          <small class="muted">
-            {autoHang
-              ? `New pieces and anything in storage: she finds a spot, builds one while cash stays above ${money(buildReserve(state))}, or swaps out a weaker piece. Pieces you take down stay down.`
-              : 'Off: new pieces wait in storage for you to place.'}
-          </small>
-        </span>
-        <span class="knob" aria-hidden="true" />
-      </button>
 
       {tab === 'market' && (
         <>

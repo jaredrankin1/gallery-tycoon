@@ -29,6 +29,12 @@ const paths: Record<string, JSX.Element> = {
       <path d="M8 21h8" />
     </>
   ),
+  inbox: (
+    <>
+      <path d="M3 13l3-8h12l3 8v6H3z" />
+      <path d="M3 13h5l1 3h6l1-3h5" />
+    </>
+  ),
   books: (
     <>
       <path d="M4 20V10" />
