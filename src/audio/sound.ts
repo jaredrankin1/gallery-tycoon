@@ -60,12 +60,16 @@ class Sound {
   /** Call once: starts audio on the first touch, pauses with the tab. */
   install() {
     // iPhone Safari only lets audio start from touchend/click (not pointerdown),
-    // so listen on every gesture until the context is actually running.
+    // and can suspend or "interrupt" the context later (app switch, a call), so
+    // every gesture checks the context and wakes it if it isn't running.
     const gestures = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
     const unlock = () => {
+      if (!this.enabled) return;
       this.start();
+      this.kick();
       this.unlockMedia();
-      if (this.ctx?.state === 'running') gestures.forEach((g) => window.removeEventListener(g, unlock, true));
+      clearTimeout(this.checkTimer);
+      this.checkTimer = window.setTimeout(() => this.checkBlocked(), 700);
     };
     gestures.forEach((g) => window.addEventListener(g, unlock, true));
     // A soft tap on every button.
@@ -78,12 +82,36 @@ class Sound {
     );
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
-      if (document.hidden) this.ctx.suspend();
-      else if (this.enabled) this.ctx.resume();
+      if (document.hidden) this.ctx.suspend().catch(() => {});
+      else if (this.enabled) this.ctx.resume().catch(() => {});
     });
   }
 
   private media: HTMLAudioElement | null = null;
+  private checkTimer = 0;
+  /** True when taps haven't managed to start audio: the page or viewer is blocking it. */
+  blocked = false;
+
+  private checkBlocked() {
+    const blocked = this.enabled && !!this.ctx && this.ctx.state !== 'running' && !document.hidden;
+    if (blocked === this.blocked) return;
+    this.blocked = blocked;
+    this.listeners.forEach((f) => f());
+  }
+
+  /** Play one silent sample inside the gesture: older iOS only unlocks on a real start(). */
+  private kick() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch {
+      /* closed context */
+    }
+  }
 
   /**
    * iOS plays Web Audio on the ringer channel, so the silent switch mutes it.
@@ -98,7 +126,10 @@ class Sound {
     } catch {
       /* not supported */
     }
-    if (this.media) return;
+    if (this.media) {
+      if (this.media.paused) this.media.play().catch(() => {});
+      return;
+    }
     const el = new Audio(SILENCE);
     el.loop = true;
     el.setAttribute('playsinline', '');
@@ -130,16 +161,20 @@ class Sound {
     }
     if (this.ctx && this.master) {
       this.master.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.08);
-      if (on) this.ctx.resume();
+      if (on) this.ctx.resume().catch(() => {});
     }
+    if (!on) this.blocked = false;
     this.listeners.forEach((f) => f());
   }
 
   private start() {
     if (!this.enabled) return;
     if (this.ctx) {
-      if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume();
-      return;
+      if (this.ctx.state === 'closed') this.ctx = null;
+      else {
+        if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume().catch(() => {});
+        return;
+      }
     }
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
