@@ -4,6 +4,7 @@ import { clamp, Rng } from './rng';
 import { baseWorkValue } from './systems/careers';
 import { newArtist } from './state';
 import { createShop } from './systems/shop';
+import { createSale, nextSaleDay } from './systems/auctions';
 import type { GameState } from './types';
 
 const KEY = 'agt.save.v4';
@@ -61,6 +62,8 @@ export function migrate(s: any): GameState | null {
   s.staff.parked ??= [];
   // Saves from before the gift shop: start them with an empty one.
   s.shop ??= createShop();
+  // Saves from before auctions: catalogue the next sale.
+  s.auction ??= createSale(s as GameState, nextSaleDay(s.day + 1));
   return s as GameState;
 }
 

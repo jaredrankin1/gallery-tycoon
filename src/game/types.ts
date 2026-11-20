@@ -63,7 +63,8 @@ export interface Patronage {
 /** painting: walls or an easel on a pedestal. sculpture: pedestals only. hanging: walls only, no frame. */
 export type ArtForm = 'painting' | 'sculpture' | 'hanging';
 
-export type ArtworkStatus = 'offered' | 'storage' | 'display' | 'sold';
+/** offered: on a dealer's books. lot: in the next auction-house sale. */
+export type ArtworkStatus = 'offered' | 'lot' | 'storage' | 'display' | 'sold';
 
 export interface Artwork {
   id: Id;
@@ -88,6 +89,42 @@ export interface Artwork {
   grade: number;
   /** Delivered by an artist you sponsor. */
   commissioned?: boolean;
+  /** How it came to you, when that's worth showing: your own collection, the family's, or won at auction. */
+  source?: ArtSource;
+}
+
+export type ArtSource = 'personal' | 'family' | 'auction';
+
+/** What you start the game owning. */
+export type StartingCollection = 'none' | 'personal' | 'family';
+
+// ---- Auctions: buying at an auction house's weekly sale ------------------------
+
+export interface AuctionLot {
+  artworkId: Id;
+  /** The printed estimate. */
+  low: number;
+  high: number;
+  /** Lowest hammer price the consignor will take. The auctioneer bids on their behalf up to it. */
+  reserve: number;
+  /** Current bid on the floor, 0 before anyone has bid. */
+  bid: number;
+  leader: 'you' | 'room' | null;
+  /** The most the room will go to (hidden from the player). */
+  roomMax: number;
+  state: 'open' | 'won' | 'lost' | 'passed';
+  /** Hammer price once it's settled. */
+  hammer?: number;
+  /** The auctioneer's last line, for the bidding panel. */
+  call?: string;
+}
+
+export interface AuctionSale {
+  id: Id;
+  house: string;
+  /** Bidding runs all of this day and closes at midnight. Lots are on view before. */
+  day: number;
+  lots: AuctionLot[];
 }
 
 // ---- Exhibitions: themed shows that run for a week -----------------------------
@@ -121,7 +158,8 @@ export interface ExhibitionSummary {
   revenue: number;
 }
 
-export type EventKind = 'opening' | 'reception' | 'talk' | 'gala';
+/** auction: you host a sale of collectors' consignments and keep a commission. */
+export type EventKind = 'opening' | 'reception' | 'talk' | 'gala' | 'auction';
 
 /** Tier 0 = none, 1 = boxed/cheap, 2 = decent, 3 = lavish. */
 export type HospitalityTier = 0 | 1 | 2 | 3;
@@ -175,7 +213,8 @@ export type LedgerCategory =
   | 'sales'
   | 'tickets'
   | 'donations'
-  | 'shop';
+  | 'shop'
+  | 'auctions';
 
 export interface LedgerEntry {
   day: number;
@@ -448,6 +487,10 @@ export interface GameState {
   /** Seeded RNG state so a run is reproducible. */
   rng: number;
   nextId: number;
+  /** The auction house's next (or current) sale. Missing on older saves until migrate() adds it. */
+  auction?: AuctionSale;
+  /** Day of your last auction night, for spacing them out. */
+  hostedAuctionDay?: number;
   /** Missing on older saves; see ensureStaff(). */
   staff?: StaffState;
   status: 'playing' | 'bankrupt';

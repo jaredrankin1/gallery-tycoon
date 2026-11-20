@@ -1,12 +1,16 @@
 import { useState } from 'preact/hooks';
 import { ASSISTANT, buildReserve, getVenueModel, RULES } from '../../game';
 import { ArtThumb, Avatar, money, Seg, Sheet, shortMoney } from '../bits';
+import { AuctionPanel } from './Auction';
 import { useGame } from '../context';
+
+const SOURCE = { personal: 'your collection', family: 'family collection', auction: 'from auction' } as const;
 
 export function CollectionSheet() {
   const { state, setUi, act, toast } = useGame();
   const owned = Object.values(state.artworks).filter((w) => w.status === 'storage' || w.status === 'display');
-  const [tab, setTab] = useState<'market' | 'owned'>('market');
+  const [tab, setTab] = useState<'market' | 'auction' | 'owned'>(state.auction?.day === state.day ? 'auction' : 'market');
+  const live = state.auction?.day === state.day;
   const offers = Object.values(state.artworks)
     .filter((w) => w.status === 'offered')
     .sort((a, b) => a.price - b.price);
@@ -17,7 +21,8 @@ export function CollectionSheet() {
     <Sheet title="Art" onClose={() => setUi({ sheet: null })}>
       <Seg
         options={[
-          { value: 'market', label: `For sale (${offers.length})` },
+          { value: 'market', label: `Dealers (${offers.length})` },
+          { value: 'auction', label: live ? 'Auction · live' : 'Auction' },
           { value: 'owned', label: `Yours (${owned.length})` },
         ]}
         value={tab}
@@ -38,7 +43,7 @@ export function CollectionSheet() {
 
       {tab === 'market' && (
         <>
-          <p class="hint">New works turn up every day. Friends of yours offer more often, and cheaper.</p>
+          <p class="hint">Dealers have new works every day, at a dealer’s markup. Artists who like you offer more often, and cheaper.</p>
           <div class="art-grid">
             {offers.map((w) => {
               const a = state.artists[w.artistId];
@@ -72,6 +77,8 @@ export function CollectionSheet() {
         </>
       )}
 
+      {tab === 'auction' && <AuctionPanel />}
+
       {tab === 'owned' && (
         <>
           {!owned.length && <p class="hint">You don’t own any art yet.</p>}
@@ -87,6 +94,7 @@ export function CollectionSheet() {
                     <small class="muted">
                       {a.name}
                       {w.commissioned && <span class="gold"> · commissioned</span>}
+                      {w.source && <span class="gold"> · {SOURCE[w.source]}</span>}
                     </small>
                     <small class="muted">
                       Worth {shortMoney(w.value)}

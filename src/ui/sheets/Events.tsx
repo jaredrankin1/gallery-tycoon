@@ -1,5 +1,8 @@
 import {
   CHEESE_PER_GUEST,
+  HOSTED_AUCTION,
+  hostedAuctionTooSoon,
+  hostedLots,
   EVENT_KIND,
   eventCost,
   expectedAttendance,
@@ -77,7 +80,11 @@ export function EventsSheet() {
                   {e.featuredArtistIds.map((id) => (
                     <Avatar artist={state.artists[id]} size="sm" />
                   ))}
-                  <small class="muted">{e.featuredArtistIds.map((id) => state.artists[id].name.split(' ')[0]).join(', ') || 'No featured artist'}</small>
+                  <small class="muted">
+                    {e.kind === 'auction'
+                      ? `Collectors' consignments, ${Math.round(HOSTED_AUCTION.commission * 100)}% commission`
+                      : e.featuredArtistIds.map((id) => state.artists[id].name.split(' ')[0]).join(', ') || 'No featured artist'}
+                  </small>
                 </span>
                 <small class="muted">
                   {TIER_LABEL[e.hospitality.wine]} wine · {TIER_LABEL[e.hospitality.cheese]} cheese · {e.hospitality.guests} guests
@@ -157,24 +164,40 @@ function Planner({ draft: d }: { draft: EventDraft }) {
       <span class="label">When</span>
       <div class="days">
         {days.map((dd) => (
-          <button class={`day ${day === dd ? 'on' : ''}`} disabled={booked.has(dd)} onClick={() => set({ day: dd })}>
+          <button
+            class={`day ${day === dd ? 'on' : ''}`}
+            disabled={booked.has(dd) || (d.kind === 'auction' && hostedAuctionTooSoon(state, dd))}
+            onClick={() => set({ day: dd })}
+          >
             <small>{weekday(dd)}</small>
             <b>{dd}</b>
           </button>
         ))}
       </div>
 
-      <span class="label">
-        Featuring {cfg.minFeatured === cfg.maxFeatured ? `${cfg.minFeatured} artist` : `${cfg.minFeatured}–${cfg.maxFeatured} artists`}
-      </span>
-      <div class="faces-pick">
-        {Object.values(state.artists).map((a) => (
-          <button class={`face ${d.featured.includes(a.id) ? 'on' : ''}`} disabled={a.relationship < 0} onClick={() => toggleArtist(a.id)}>
-            <Avatar artist={a} />
-            <small>{a.name.split(' ')[0]}</small>
-          </button>
-        ))}
-      </div>
+      {cfg.maxFeatured > 0 ? (
+        <>
+          <span class="label">
+            Featuring {cfg.minFeatured === cfg.maxFeatured ? `${cfg.minFeatured} artist` : `${cfg.minFeatured}–${cfg.maxFeatured} artists`}
+          </span>
+          <div class="faces-pick">
+            {Object.values(state.artists).map((a) => (
+              <button class={`face ${d.featured.includes(a.id) ? 'on' : ''}`} disabled={a.relationship < 0} onClick={() => toggleArtist(a.id)}>
+                <Avatar artist={a} />
+                <small>{a.name.split(' ')[0]}</small>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div class="auction-note">
+          <b>You host, collectors consign</b>
+          <small class="muted">
+            About {hostedLots(state)} lots will come in (more as your reputation grows). You keep {Math.round(HOSTED_AUCTION.commission * 100)}% of every hammer
+            price. A full room with good wine bids higher. One auction night a week.
+          </small>
+        </div>
+      )}
 
       <div class="hosp">
         <TierPicker icon="wine" label="Wine" value={d.hospitality.wine} perGuest={WINE_PER_GUEST} onPick={(t) => setH({ wine: t })} />

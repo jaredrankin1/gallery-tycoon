@@ -246,7 +246,7 @@ h3.section::after { content: ''; flex: 1; height: var(--rule); background: var(-
 .ticket > :not(.ticket-date) { padding-top: 2.4cqw; padding-bottom: 2.4cqw; }
 .ticket b, .ticket small { display: block; }
 .faces { display: flex; align-items: center; gap: 1cqw; margin: 1cqw 0; }
-.kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2cqw; }
+.kinds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.6cqw; font-size: 0.84em; }
 .kind { background: var(--card); border: var(--rule) solid var(--ink); border-radius: 0; padding: 2.6cqw 1cqw; display: flex; flex-direction: column; align-items: center; gap: 0.6cqw; font-weight: 700; }
 .kind small { color: var(--muted); font-weight: 500; }
 .kind.on { background: var(--yellow); }
@@ -502,3 +502,25 @@ q.said::after { content: '”'; }
 .moods { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.4cqw 2.4cqw; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .moods > span:nth-child(3n + 1) { text-align: right; }
 .moods > span.on { color: var(--ink); font-weight: 800; }
+
+/* Auction house: a ticket-style header, then lots as numbered cards. Outbid lots get a red rule. */
+.sale-head { display: flex; align-items: stretch; gap: 3cqw; margin: 3cqw 0 0; background: var(--card); border: var(--rule) solid var(--ink); }
+.sale-date { flex: 0 0 14cqw; display: flex; flex-direction: column; justify-content: center; text-align: center; background: var(--blue); color: #fff; border-right: var(--rule) solid var(--ink); padding: 2.4cqw 0; }
+.sale-head.live .sale-date { background: var(--red); }
+.sale-date small { color: #fff; text-transform: uppercase; font-weight: 700; letter-spacing: 0.1em; font-size: 0.66em; }
+.sale-date b { font-family: var(--display); font-weight: 800; font-size: 1.2em; text-transform: uppercase; }
+.sale-head .grow { padding: 2.4cqw 3cqw 2.4cqw 0; display: flex; flex-direction: column; gap: 0.6cqw; }
+.sale-head .grow b { font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+.lot { background: var(--card); border: var(--rule) solid var(--ink); padding: 2.4cqw 3cqw; display: flex; flex-direction: column; gap: 1.8cqw; }
+.lot.outbid { border-left: var(--thick) solid var(--red); }
+.lot.won { background: var(--tint); }
+.lot.lost, .lot.passed { opacity: 0.6; }
+.lot-top { display: flex; align-items: center; gap: 3cqw; }
+.lot-top .grow { display: flex; flex-direction: column; gap: 0.6cqw; }
+.lot-top .grow > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lot-no { flex: 0 0 auto; width: 6.4cqw; height: 6.4cqw; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-weight: 800; font-size: 0.75em; }
+.lot-call { font-style: italic; font-size: 0.82em; border-left: var(--rule) solid var(--yellow); padding-left: 2cqw; }
+.lot-bid { display: flex; align-items: center; gap: 2cqw; }
+.lot-status { font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.7em; }
+.won-tag { color: var(--blue); }
+.auction-note { background: var(--card); border: var(--rule) solid var(--ink); padding: 2.4cqw 3cqw; display: flex; flex-direction: column; gap: 0.8cqw; margin-top: 3cqw; }
