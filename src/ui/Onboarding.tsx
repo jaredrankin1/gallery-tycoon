@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { ASSISTANT, clearSave, COLLECTION, createNewGame, DIFFICULTY, loadGame, saveGame, VENUE, type Difficulty, type StartingCollection, type VenueType } from '../game';
+import { ASSISTANT, clearSave, COLLECTION, createNewGame, DIFFICULTY, TUTORIAL, loadGame, saveGame, startTutorial, VENUE, type Difficulty, type StartingCollection, type VenueType } from '../game';
 import { portraitUrl } from '../render/sprites';
 import { money } from './bits';
 import { useGame } from './context';
@@ -18,7 +18,7 @@ const NAMES: Record<VenueType, string[]> = {
   museum: ['The Harbor Museum', 'Museum of Small Hours', 'The Lantern House', 'Hall of Quiet Things'],
 };
 
-type Step = 'welcome-back' | 'venue' | 'money' | 'collection' | 'name';
+type Step = 'welcome-back' | 'venue' | 'money' | 'collection' | 'name' | 'tour';
 type Collection = Exclude<StartingCollection, 'none'>;
 
 /**
@@ -48,16 +48,17 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
     return { works: works.length, value: works.reduce((t, w) => t + w.value, 0), cash: g.cash };
   };
 
-  const open = () => {
+  const open = (tour: boolean) => {
     clearSave();
     const game = createNewGame({ name, difficulty, venue, autoHang: true, collection: collection ?? 'personal' });
+    if (tour) startTutorial(game);
     store.autosave = true;
     store.load(game, 1);
     saveGame(game);
     onDone(true);
   };
 
-  const steps: Step[] = ['venue', 'money', 'collection', 'name'];
+  const steps: Step[] = ['venue', 'money', 'collection', 'name', 'tour'];
   const at = steps.indexOf(step);
   const back = at > 0 ? () => setStep(steps[at - 1]) : save && step !== 'welcome-back' ? () => setStep('welcome-back') : null;
 
@@ -189,8 +190,22 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
                 </button>
               ))}
             </div>
-            <button class="btn primary wide big" onClick={open}>
-              Open the doors
+            <button class="btn primary wide big" onClick={() => setStep('tour')}>
+              That’s the one
+            </button>
+          </>
+        )}
+
+        {step === 'tour' && (
+          <>
+            <p class="line">
+              <b>{name.trim() || (venue === 'museum' ? 'The New Museum' : 'Untitled Gallery')}</b>. I love it. Before we open: want me to walk you through the first week? Nine quick jobs, and our first patron has promised a {money(TUTORIAL.rewardCash)} welcome gift once they’re done.
+            </p>
+            <button class="btn primary wide big" onClick={() => open(true)}>
+              Show me the ropes
+            </button>
+            <button class="btn ghost wide" onClick={() => open(false)}>
+              Skip the tour, I’ve got this
             </button>
           </>
         )}

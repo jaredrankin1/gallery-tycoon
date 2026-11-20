@@ -527,6 +527,17 @@ export interface ArtistCall {
   result?: { relationship: number; reputation: number };
 }
 
+/** Marisol's opening-week tour. Missing on saves from before it existed (and means: no tour). */
+export interface TutorialProgress {
+  status: 'on' | 'done' | 'skipped';
+  /** Index into the UI's task list. */
+  step: number;
+  /** The welcome gift is paid once, even if you replay the tour. */
+  rewarded: boolean;
+  /** Tasks passed over with "Skip this one". Skip too many and there's no gift. */
+  skipped?: number;
+}
+
 export interface GameState {
   version: 5;
   name: string;
@@ -575,5 +586,6 @@ export interface GameState {
   artistCalls?: { count: number; lastDay: number };
   /** Missing on older saves; see ensureStaff(). */
   staff?: StaffState;
+  tutorial?: TutorialProgress;
   status: 'playing' | 'bankrupt';
 }

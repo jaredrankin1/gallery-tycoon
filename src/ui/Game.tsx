@@ -10,6 +10,7 @@ import { PeopleSheet } from './sheets/People';
 import { GuestCard } from './GuestCard';
 import { ArtistTalk, CallerFace } from './ArtistTalk';
 import { Onboarding } from './Onboarding';
+import { TutorialCard, tutorialPulse } from './Tutorial';
 import { portraitUrl } from '../render/sprites';
 import { BooksSheet } from './sheets/Books';
 import { ShopSheet } from './sheets/Shop';
@@ -36,7 +37,7 @@ const DOCK: { id: SheetId | 'build'; label: string; icon: string }[] = [
 
 export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store; onQuit: () => void; onboarding: boolean; onSetupDone: () => void }) {
   const state = useStore(store);
-  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', coach: false, talk: false });
+  const [ui, setUiState] = useState<Ui>({ sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', talk: false });
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const setUi = useCallback((patch: Partial<Ui>) => setUiState((u) => ({ ...u, ...patch })), []);
@@ -193,7 +194,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
 
   const openDock = (id: SheetId | 'build') => {
     if (id === 'build') setUi({ building: !ui.building, build: null, sheet: null, selected: null, guest: null });
-    else setUi({ sheet: ui.sheet === id ? null : id, building: false, build: null, selected: null, guest: null, coach: id === 'collection' ? false : ui.coach });
+    else setUi({ sheet: ui.sheet === id ? null : id, building: false, build: null, selected: null, guest: null });
   };
 
   if (onboarding) {
@@ -202,9 +203,9 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
         <div class="game">
           <canvas ref={canvasRef} class="iso" />
           <Onboarding
-            onDone={(fresh) => {
+            onDone={() => {
               onSetupDone();
-              setUi({ coach: fresh, guest: null, selected: null, sheet: null });
+              setUi({ guest: null, selected: null, sheet: null });
             }}
           />
         </div>
@@ -292,15 +293,7 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
           </button>
         )}
         {ui.talk && <ArtistTalk onClose={closeTalk} />}
-        {ui.coach && !caller && !ui.sheet && !ui.building && (
-          <div class="coach">
-            <img src={portraitUrl(ASSISTANT.sprite)} alt="" />
-            <p>Walls look bare, boss. Tap <b>Art</b> below to buy our first piece, then tap a wall spot and I’ll hang it.</p>
-            <button class="icon-btn" onClick={() => setUi({ coach: false })} aria-label="Dismiss">
-              <Icon name="close" size={16} />
-            </button>
-          </div>
-        )}
+        {!ui.talk && <TutorialCard low={!caller && !ui.sheet && !ui.building && !ui.selected && !ui.guest} />}
         {ui.building && <BuildTray />}
 
         {ui.sheet === 'collection' && <CollectionSheet />}
@@ -311,10 +304,11 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
 
         <nav class="dock">
           {DOCK.map((d) => {
+            const pulse = tutorialPulse(state, ui);
             const on = d.id === 'build' ? ui.building : ui.sheet === d.id || (d.id === 'books' && ui.sheet === 'shop');
             const badge = d.id === 'events' ? state.events.length + (state.exhibition ? 1 : 0) : d.id === 'collection' ? Object.values(state.artworks).filter((w) => w.status === 'storage').length : 0;
             return (
-              <button class={`${on ? 'on' : ''} ${ui.coach && d.id === 'collection' ? 'pulse' : ''}`} onClick={() => openDock(d.id)}>
+              <button class={`${on ? 'on' : ''} ${pulse === d.id ? 'pulse' : ''}`} onClick={() => openDock(d.id)}>
                 <span class="dock-icon">
                   <Icon name={d.icon} />
                   {badge > 0 && <i class="badge">{badge}</i>}
@@ -333,6 +327,18 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
               <button class="btn primary wide" onClick={() => { setMenu(false); store.setSpeed(wasSpeed.current); }}>
                 Resume
               </button>
+              {state.tutorial?.status !== 'on' && (
+                <button
+                  class="btn ghost wide"
+                  onClick={() => {
+                    act({ type: 'tutorial', to: 'start' });
+                    setMenu(false);
+                    store.setSpeed(wasSpeed.current);
+                  }}
+                >
+                  Replay {ASSISTANT.name}’s tour
+                </button>
+              )}
               <button class="btn ghost wide" onClick={onQuit}>
                 Back to title
               </button>

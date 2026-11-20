@@ -28,8 +28,6 @@ export interface Ui {
   peopleTab: 'guests' | 'artists' | 'staff';
   /** Which half of the Events sheet: the themed show, or one-night events. */
   eventsTab: 'show' | 'events';
-  /** First-run tip pointing at the Art button. */
-  coach: boolean;
   /** Talking to the artist who dropped by. */
   talk: boolean;
 }
