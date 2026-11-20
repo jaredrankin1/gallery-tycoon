@@ -609,3 +609,7 @@ canvas.portrait { object-fit: contain; }
 .artist-sample .thumb.lg.img img { width: auto; max-width: 100%; height: auto; max-height: 34cqw; object-fit: contain; }
 .artist-sample figcaption { display: flex; flex-direction: column; gap: 0.8cqw; min-width: 0; }
 .artist-sample figcaption b { font-weight: 800; }
+
+/* taps haven't been able to start audio here (e.g. an embedding viewer blocks it) */
+.sound-btn.blocked { background: var(--red); }
+.sound-btn.blocked .icon { color: #fff; }

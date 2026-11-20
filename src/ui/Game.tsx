@@ -366,10 +366,12 @@ export function Game({ store, onQuit, onboarding, onSetupDone }: { store: Store;
 
 function SoundToggle() {
   const [on, setOn] = useState(sound.enabled);
-  useEffect(() => sound.subscribe(() => setOn(sound.enabled)), []);
+  const [blocked, setBlocked] = useState(sound.blocked);
+  useEffect(() => sound.subscribe(() => (setOn(sound.enabled), setBlocked(sound.blocked))), []);
+  const label = blocked ? 'Sound is blocked by this browser or viewer' : on ? 'Sound on: tap to mute' : 'Sound off: tap to unmute';
   return (
-    <button class="mini sound-btn" onClick={() => sound.setEnabled(!on)} aria-label={on ? 'Sound on: tap to mute' : 'Sound off: tap to unmute'} aria-pressed={on} title={on ? 'Mute' : 'Unmute'}>
-      <Icon name={on ? 'sound' : 'mute'} size={16} />
+    <button class={`mini sound-btn${blocked ? ' blocked' : ''}`} onClick={() => sound.setEnabled(!on)} aria-label={label} aria-pressed={on} title={label}>
+      <Icon name={on && !blocked ? 'sound' : 'mute'} size={16} />
     </button>
   );
 }
