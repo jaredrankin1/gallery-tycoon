@@ -73,6 +73,9 @@ export class IsoRenderer {
   private callSegs: { key: string; segs: Segment[] } | null = null;
   /** Where each guest was drawn last frame, in canvas pixels, for tapping. */
   private guestHits: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+  /** The visiting artist's floating "Talk" tag, in canvas pixels: drawn over everything, tapped first. */
+  private callerTag: { id: string; x: number; y: number; name: string; waiting: boolean } | null = null;
+  private callerTagHit: { id: string; x0: number; y0: number; x1: number; y1: number } | null = null;
   private selectedGuest: string | null = null;
   /** Absolute game time (hours, fractional), supplied by the UI each frame. */
   private clock: () => number = () => 0;
@@ -303,6 +306,12 @@ export class IsoRenderer {
     this.drag = null;
     if (!drag || drag.moved || !this.state) return;
     const p = this.local(e);
+    // The artist's floating tag sits above the crowd, so it always wins.
+    const tag = this.callerTagHit;
+    if (tag && p.x >= tag.x0 && p.x <= tag.x1 && p.y >= tag.y0 && p.y <= tag.y1) return this.onGuestTap(tag.id);
+    // A visitor standing in front of the artist shouldn't swallow the tap.
+    const artist = this.guestHits.find((h) => h.id.startsWith('artist:') && p.x >= h.x0 && p.x <= h.x1 && p.y >= h.y0 && p.y <= h.y1);
+    if (artist) return this.onGuestTap(artist.id);
     // People first: front-most (last drawn) wins.
     for (let i = this.guestHits.length - 1; i >= 0; i--) {
       const h = this.guestHits[i];
@@ -381,6 +390,7 @@ export class IsoRenderer {
       if (f.kind !== 'wallHang') items.push({ depth: f.x + f.y + 1, draw: () => this.drawFixture(f) });
     }
     this.guestHits = [];
+    this.callerTag = null;
     this.guestCount = 0;
     const here: { v: GuestVisit; pose: NonNullable<ReturnType<typeof poseAt>>; key: string }[] = [];
     for (const v of s.visits) {
@@ -442,6 +452,53 @@ export class IsoRenderer {
       ctx.fillStyle = this.partyNow() ? `rgba(70, 30, 60, ${0.22 * dusk})` : `rgba(14, 18, 52, ${0.42 * dusk})`;
       ctx.fillRect(0, 0, cw, ch);
     }
+    this.drawCallerTag(cw);
+  }
+
+  /** "Name · TALK" over the visiting artist's head, at screen size and above the dusk, so it's easy to hit. */
+  private drawCallerTag(cw: number) {
+    const tag = this.callerTag;
+    this.callerTagHit = null;
+    if (!tag) return;
+    const ctx = this.ctx;
+    const label = tag.waiting ? `${tag.name} · TALK` : `${tag.name} · …`;
+    ctx.font = '800 13px Jost, Futura, "Century Gothic", ui-sans-serif, system-ui, sans-serif';
+    const w = Math.ceil(ctx.measureText(label).width) + 34;
+    const h = 28;
+    const minY = this.canvas.clientHeight * this.insets.top + 6;
+    const x = Math.max(6, Math.min(cw - w - 6, tag.x - w / 2));
+    const y = Math.max(minY, tag.y - h - 8);
+    // Shadow, box, and a pointer down to the artist (when the tag isn't pushed off them).
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(x + 3, y + 3, w, h);
+    ctx.fillStyle = '#f4b400';
+    ctx.strokeStyle = '#121212';
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    const px = Math.max(x + 8, Math.min(x + w - 8, tag.x));
+    if (y + h + 8 <= tag.y + 4) {
+      ctx.beginPath();
+      ctx.moveTo(px - 6, y + h);
+      ctx.lineTo(px, y + h + 8);
+      ctx.lineTo(px + 6, y + h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillRect(px - 5, y + h - 2, 10, 3);
+    }
+    // A red dot for "new", then the name.
+    ctx.fillStyle = '#d7301f';
+    ctx.beginPath();
+    ctx.arc(x + 13, y + h / 2, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#121212';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + 24, y + h / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
+    // Generous hit area: the tag plus a little margin all round.
+    this.callerTagHit = { id: tag.id, x0: x - 8, y0: y - 8, x1: x + w + 8, y1: y + h + 12 };
   }
 
   private poly(pts: Pt[], fill: string, stroke?: string) {
@@ -745,28 +802,16 @@ export class IsoRenderer {
     const meta = SPRITES[call.look.sprite];
     if (!meta) return;
     const p = toScreen(pose.x, pose.y);
-    const top = p.y - meta.cell[1] * spriteScale(meta) - 14 + Math.sin(t / 220) * 2;
-    const ctx = this.ctx;
-    // A little Bauhaus speech mark: yellow square, black rule, a bold "!" (or "…" while you talk).
-    ctx.fillStyle = '#f4b400';
-    ctx.strokeStyle = '#121212';
-    ctx.lineWidth = 1.5;
-    ctx.fillRect(p.x - 7, top - 7, 14, 14);
-    ctx.strokeRect(p.x - 7, top - 7, 14, 14);
-    ctx.beginPath();
-    ctx.moveTo(p.x - 3, top + 7);
-    ctx.lineTo(p.x, top + 11);
-    ctx.lineTo(p.x + 3, top + 7);
-    ctx.closePath();
-    ctx.fillStyle = '#f4b400';
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#121212';
-    ctx.font = '800 11px Jost, Futura, "Century Gothic", ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(call.stage === 'waiting' ? '!' : '…', p.x, top + 0.5);
-    ctx.textBaseline = 'alphabetic';
+    const top = p.y - meta.cell[1] * spriteScale(meta) + Math.sin(t / 220) * 2;
+    // Remember where their head is on screen; the tag itself is drawn last, over everyone.
+    const k = this.scale;
+    this.callerTag = {
+      id: v.guestId,
+      x: this.origin.x + this.pan.x + p.x * k,
+      y: this.origin.y + this.pan.y + top * k,
+      name: v.name?.split(' ')[0] ?? 'Artist',
+      waiting: call.stage === 'waiting',
+    };
   }
 
   /** Marisol, the gallery assistant. Staff: not counted, not tappable. */
