@@ -12,7 +12,7 @@ export function CollectionSheet() {
   const [tab, setTab] = useState<'market' | 'auction' | 'owned'>(state.auction?.day === state.day ? 'auction' : 'market');
   const live = state.auction?.day === state.day;
   const offers = Object.values(state.artworks)
-    .filter((w) => w.status === 'offered')
+    .filter((w) => w.status === 'offered' && !w.withArtist)
     .sort((a, b) => a.price - b.price);
   const canSell = getVenueModel(state.venue).canSell;
   const autoHang = !!state.staff?.autoHang;

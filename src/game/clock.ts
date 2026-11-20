@@ -1,6 +1,7 @@
 import { DIFFICULTY, GUESTS, RULES, TIME, VENUE } from './config';
 import type { Rng } from './rng';
 import { endOfDayArtists } from './systems/artists';
+import { artistCallHour } from './systems/artistCalls';
 import { endOfDayCareers } from './systems/careers';
 import { endOfDayExhibition } from './systems/exhibitions';
 import { endOfDayPatronage, weeklyPatronage } from './systems/patronage';
@@ -56,6 +57,9 @@ export function stepHour(state: GameState, rng: Rng): void {
 
   if (state.tick === TIME.ticksPerDay - 1) endOfDay(state, rng);
   else state.tick += 1;
+
+  // An artist may walk in with new work (timed from the hour now on screen).
+  artistCallHour(state, rng);
 
   if (state.cash < RULES.overdraftLimit) {
     state.status = 'bankrupt';

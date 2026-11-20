@@ -1,5 +1,6 @@
 import {
   assistantPose,
+  callTimeline,
   shownOnFixture,
   canPlace,
   poseAt,
@@ -12,6 +13,7 @@ import {
   type Fixture,
   type FixtureKind,
   type GameState,
+  type ArtistCall,
   type GuestVisit,
   type Segment,
   type StaffPose,
@@ -62,6 +64,8 @@ export class IsoRenderer {
   private state: GameState | null = null;
   /** Cached choreography per visit (keyed by guest + start). */
   private timelines = new Map<string, Segment[]>();
+  /** The visiting artist's walk, rebuilt when their visit changes stage. */
+  private callSegs: { key: string; segs: Segment[] } | null = null;
   /** Where each guest was drawn last frame, in canvas pixels, for tapping. */
   private guestHits: { id: string; x0: number; y0: number; x1: number; y1: number }[] = [];
   private selectedGuest: string | null = null;
@@ -390,6 +394,9 @@ export class IsoRenderer {
       const p = at ? { ...pose, x: at.x, y: at.y } : pose;
       items.push({ depth: p.x + p.y, draw: () => this.drawGuest(v, p, t) });
     }
+    // A visiting artist: drawn like a guest but never counted (they're not a visitor), and tappable to talk.
+    const caller = this.callerNow(now);
+    if (caller) items.push({ depth: caller.pose.x + caller.pose.y, draw: () => this.drawCaller(caller.call, caller.pose, t) });
     const staff = assistantPose(s, now);
     if (performance.now() < this.cheerUntil && staff.anim !== 'walk') staff.anim = 'cheer';
     items.push({ depth: staff.x + staff.y, draw: () => this.drawAssistant(staff) });
@@ -697,6 +704,49 @@ export class IsoRenderer {
       this.timelines.set(key, segs);
     }
     return segs;
+  }
+
+  private callerNow(now: number) {
+    const call = this.state!.artistCall;
+    if (!call || now < call.arrive) return null;
+    const key = `${call.artistId}@${call.arrive}:${call.stage === 'waiting' ? 'w' : 't'}:${call.leftAt ?? ''}`;
+    if (this.callSegs?.key !== key) this.callSegs = { key, segs: callTimeline(call, this.state!.floor) };
+    const segs = this.callSegs.segs;
+    if (!segs.length || now >= segs[segs.length - 1].end) return null;
+    const pose = poseAt(segs, now);
+    return pose ? { call, pose } : null;
+  }
+
+  /** The visiting artist, with a "talk to me" marker while they wait. */
+  private drawCaller(call: ArtistCall, pose: NonNullable<ReturnType<typeof poseAt>>, t: number) {
+    const v: GuestVisit = { guestId: `artist:${call.artistId}`, start: call.arrive, end: Infinity, steps: [], look: call.look, name: this.state!.artists[call.artistId]?.name };
+    this.drawGuest(v, pose, t);
+    if (call.stage === 'done') return;
+    const meta = SPRITES[call.look.sprite];
+    if (!meta) return;
+    const p = toScreen(pose.x, pose.y);
+    const top = p.y - meta.cell[1] * spriteScale(meta) - 14 + Math.sin(t / 220) * 2;
+    const ctx = this.ctx;
+    // A little Bauhaus speech mark: yellow square, black rule, a bold "!" (or "…" while you talk).
+    ctx.fillStyle = '#f4b400';
+    ctx.strokeStyle = '#121212';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(p.x - 7, top - 7, 14, 14);
+    ctx.strokeRect(p.x - 7, top - 7, 14, 14);
+    ctx.beginPath();
+    ctx.moveTo(p.x - 3, top + 7);
+    ctx.lineTo(p.x, top + 11);
+    ctx.lineTo(p.x + 3, top + 7);
+    ctx.closePath();
+    ctx.fillStyle = '#f4b400';
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#121212';
+    ctx.font = '800 11px Jost, Futura, "Century Gothic", ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(call.stage === 'waiting' ? '!' : '…', p.x, top + 0.5);
+    ctx.textBaseline = 'alphabetic';
   }
 
   /** Marisol, the gallery assistant. Staff: not counted, not tappable. */

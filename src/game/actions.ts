@@ -4,6 +4,7 @@ import { newId } from './state';
 import { adjustRelationship } from './systems/artists';
 import { ensureStaff, park, staffUpdate, unpark } from './systems/autohang';
 import { closeExhibition, mountExhibition } from './systems/exhibitions';
+import { beginTalk, chooseTalk, leaveTalk } from './systems/artistCalls';
 import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/patronage';
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
@@ -49,6 +50,10 @@ export type Action =
   /** Staff: take someone on (replacing whoever holds that job), or let them go. */
   | { type: 'hireStaff'; candidateId: string }
   | { type: 'letGoStaff'; role: StaffRole }
+  /** Artist visits: walk over and talk, pick a line, or walk off. */
+  | { type: 'talkToArtist' }
+  | { type: 'talkChoose'; optionId: string }
+  | { type: 'leaveTalk' }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -73,7 +78,7 @@ function apply(state: GameState, action: Action): string | void {
   switch (action.type) {
     case 'buyArtwork': {
       const work = state.artworks[action.artworkId];
-      if (!work || work.status !== 'offered') return 'That work is no longer available.';
+      if (!work || work.status !== 'offered' || work.withArtist) return 'That work is no longer available.';
       // An appraiser on staff talks the dealer down.
       const cut = Math.round((work.price * appraiserDiscount(state)) / 10) * 10;
       const paid = work.price - cut;
@@ -251,6 +256,20 @@ function apply(state: GameState, action: Action): string | void {
       return hire(state, action.candidateId);
     case 'letGoStaff':
       return letGo(state, action.role);
+    case 'talkToArtist': {
+      const rng = new Rng(state.rng);
+      const err = beginTalk(state, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'talkChoose': {
+      const rng = new Rng(state.rng);
+      const err = chooseTalk(state, action.optionId, rng);
+      state.rng = rng.state;
+      return err;
+    }
+    case 'leaveTalk':
+      return leaveTalk(state);
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) {

@@ -65,8 +65,9 @@ describe('gift shop', () => {
       expect(income).toBeGreaterThan(0);
       let fromStock = 0;
       for (const k of MERCH_KINDS) {
-        const sold = before[k].stock - s.shop.lines[k].stock;
-        expect(sold).toBe(s.shop.lines[k].soldTotal);
+        // Stock goes down by what sold, plus anything shoplifters took (no guard here).
+        const sold = s.shop.lines[k].soldTotal;
+        expect(before[k].stock - s.shop.lines[k].stock).toBeGreaterThanOrEqual(sold);
         fromStock += sold * s.shop.lines[k].price;
       }
       expect(fromStock).toBe(income);

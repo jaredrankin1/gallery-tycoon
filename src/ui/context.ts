@@ -30,6 +30,8 @@ export interface Ui {
   eventsTab: 'show' | 'events';
   /** First-run tip pointing at the Art button. */
   coach: boolean;
+  /** Talking to the artist who dropped by. */
+  talk: boolean;
 }
 
 export interface GameCtx {

@@ -36,3 +36,4 @@ export { careerStage, potentialStars, isScouted, stageIndex, baseWorkValue } fro
 export { stipendFor, canSponsor, patronCount, signedWithRival, atRisk } from './systems/patronage';
 export { synergy, themeTitle, fitsTheme, exhibitionCost, liveScore, type Synergy, type SynergyBonus } from './systems/exhibitions';
 export { askingBid, withPremium, saleIsLive, nextSaleDay, hostedLots, hostedAuctionTooSoon } from './systems/auctions';
+export { callTimeline, callPrice, speakerName, toneScore, voiceOf } from './systems/artistCalls';
