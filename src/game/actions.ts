@@ -9,6 +9,7 @@ import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
 import { openingStock, orderStock, shelfSpace } from './systems/shop';
+import { hostedAuctionTooSoon, passLot, placeBid } from './systems/auctions';
 import { stepHour } from './clock';
 import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, MerchKind, StipendTier } from './types';
 import { getVenueModel } from './venues';
@@ -40,6 +41,9 @@ export type Action =
   | { type: 'restockMerch'; kind: MerchKind; batches: number }
   | { type: 'setMerchPrice'; kind: MerchKind; price: number }
   | { type: 'setAutoRestock'; on: boolean }
+  /** Auction house sale: raise your paddle on a lot (one increment), or let it go. */
+  | { type: 'auctionBid'; lot: number }
+  | { type: 'auctionPass'; lot: number }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -149,6 +153,7 @@ function apply(state: GameState, action: Action): string | void {
       const cfg = EVENT_KIND[action.kind];
       if (action.day < state.day + cfg.minDaysAhead) return `Book a ${cfg.label.toLowerCase()} at least ${cfg.minDaysAhead} day(s) ahead.`;
       if (state.events.some((e) => e.day === action.day)) return 'You already have an event that night.';
+      if (action.kind === 'auction' && hostedAuctionTooSoon(state, action.day)) return 'Collectors need a week between auction nights to consign new work.';
       const n = action.featuredArtistIds.length;
       if (n < cfg.minFeatured || n > cfg.maxFeatured) {
         return cfg.minFeatured === cfg.maxFeatured
@@ -226,6 +231,10 @@ function apply(state: GameState, action: Action): string | void {
       state.shop.autoRestock = action.on;
       return;
     }
+    case 'auctionBid':
+      return placeBid(state, action.lot);
+    case 'auctionPass':
+      return passLot(state, action.lot);
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) {

@@ -10,6 +10,7 @@ import { notify } from './feed';
 import { eventGuests } from './visits';
 import { post } from './ledger';
 import { shopSales } from './shop';
+import { hostAuction } from './auctions';
 
 export function hospitalityCost(plan: HospitalityPlan): number {
   return plan.guests * (WINE_PER_GUEST[plan.wine] + CHEESE_PER_GUEST[plan.cheese]);
@@ -81,7 +82,14 @@ export function resolveEvent(state: GameState, event: ScheduledEvent, rng: Rng):
   }
 
   const venue = getVenueModel(state.venue);
-  const { income, soldArtworkIds } = venue.onEvent(state, event, attendance, satisfaction, rng);
+  // An auction night earns its commission instead of the venue's usual takings.
+  const { income, soldArtworkIds } =
+    event.kind === 'auction'
+      ? (() => {
+          state.hostedAuctionDay = state.day;
+          return { income: hostAuction(state, attendance, satisfaction, rng).commission, soldArtworkIds: [] as string[] };
+        })()
+      : venue.onEvent(state, event, attendance, satisfaction, rng);
   // Happy crowds browse the gift shop on the way out.
   shopSales(state, rng, attendance, SHOP.eventSpend * (0.5 + satisfaction));
 

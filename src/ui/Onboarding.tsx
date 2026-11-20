@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { ASSISTANT, clearSave, createNewGame, DIFFICULTY, loadGame, saveGame, VENUE, type Difficulty, type VenueType } from '../game';
+import { ASSISTANT, clearSave, COLLECTION, createNewGame, DIFFICULTY, loadGame, saveGame, VENUE, type Difficulty, type StartingCollection, type VenueType } from '../game';
 import { portraitUrl } from '../render/sprites';
 import { money } from './bits';
 import { useGame } from './context';
@@ -8,7 +8,7 @@ import { useGame } from './context';
 export const PREVIEW_SEED = 7;
 
 const MONEY: { id: Difficulty; title: string; note: string }[] = [
-  { id: 'easy', title: 'Family money', note: 'Room to make mistakes. Your name opens doors.' },
+  { id: 'easy', title: 'A trust fund', note: 'Room to make mistakes. Your name opens doors.' },
   { id: 'normal', title: 'Savings and a bank loan', note: 'Enough to start right, not enough to waste.' },
   { id: 'hard', title: 'Whatever’s under the mattress', note: 'Every bottle of wine counts. Nobody knows you yet.' },
 ];
@@ -18,7 +18,8 @@ const NAMES: Record<VenueType, string[]> = {
   museum: ['The Harbor Museum', 'Museum of Small Hours', 'The Lantern House', 'Hall of Quiet Things'],
 };
 
-type Step = 'welcome-back' | 'venue' | 'money' | 'name';
+type Step = 'welcome-back' | 'venue' | 'money' | 'collection' | 'name';
+type Collection = Exclude<StartingCollection, 'none'>;
 
 /**
  * First run, told over the live room: Marisol, your gallery assistant, walks you through
@@ -31,23 +32,32 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
   const [venue, setVenue] = useState<VenueType>(store.state.venue);
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [name, setName] = useState('');
+  const [collection, setCollection] = useState<Collection | null>(null);
 
-  const preview = (v: VenueType, d: Difficulty) => {
+  const preview = (v: VenueType, d: Difficulty, c: Collection | null = collection) => {
     setVenue(v);
     setDifficulty(d);
-    store.load(createNewGame({ name: '', difficulty: d, venue: v, seed: PREVIEW_SEED }), 0);
+    setCollection(c);
+    store.load(createNewGame({ name: '', difficulty: d, venue: v, seed: PREVIEW_SEED, collection: c ?? 'none' }), 0);
+  };
+
+  /** What each collection would hand you, for the cards. */
+  const worth = (c: Collection) => {
+    const g = createNewGame({ name: '', difficulty, venue, seed: PREVIEW_SEED, collection: c });
+    const works = Object.values(g.artworks).filter((w) => w.source === c);
+    return { works: works.length, value: works.reduce((t, w) => t + w.value, 0), cash: g.cash };
   };
 
   const open = () => {
     clearSave();
-    const game = createNewGame({ name, difficulty, venue, autoHang: true });
+    const game = createNewGame({ name, difficulty, venue, autoHang: true, collection: collection ?? 'personal' });
     store.autosave = true;
     store.load(game, 1);
     saveGame(game);
     onDone(true);
   };
 
-  const steps: Step[] = ['venue', 'money', 'name'];
+  const steps: Step[] = ['venue', 'money', 'collection', 'name'];
   const at = steps.indexOf(step);
   const back = at > 0 ? () => setStep(steps[at - 1]) : save && step !== 'welcome-back' ? () => setStep('welcome-back') : null;
 
@@ -128,8 +138,36 @@ export function Onboarding({ onDone }: { onDone: (fresh: boolean) => void }) {
                 </button>
               ))}
             </div>
-            <button class="btn primary wide" onClick={() => setStep('name')}>
+            <button class="btn primary wide" onClick={() => setStep('collection')}>
               That'll do
+            </button>
+          </>
+        )}
+
+        {step === 'collection' && (
+          <>
+            <p class="line">And the walls? We can start with what you already own, or open up the family storeroom.</p>
+            <div class="choices">
+              {(Object.keys(COLLECTION) as Collection[]).map((c) => {
+                const w = worth(c);
+                return (
+                  <button class={`choice ${collection === c ? 'on' : ''}`} onClick={() => preview(venue, difficulty, c)}>
+                    <span class="choice-row">
+                      <b>{COLLECTION[c].label}</b>
+                      <b class="amount">{w.works} works</b>
+                    </span>
+                    <small>{COLLECTION[c].note}</small>
+                    <small class="choice-row">
+                      <span>Art worth about {money(w.value)}</span>
+                      <span>Cash {money(w.cash)}</span>
+                    </small>
+                  </button>
+                );
+              })}
+            </div>
+            <p class="hint">Anything else comes from dealers (pricey), the weekly auction, or the artists themselves.</p>
+            <button class="btn primary wide" disabled={!collection} onClick={() => setStep('name')}>
+              {collection === 'family' ? 'Open the storeroom' : collection ? 'Hang my pieces' : 'Pick one'}
             </button>
           </>
         )}

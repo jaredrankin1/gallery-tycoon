@@ -97,6 +97,7 @@ export const EVENT_KIND: Record<EventKind, EventKindConfig> = {
   reception: { label: 'Reception', short: 'Reception', baseCost: 800, baseAttendance: 35, minFeatured: 0, maxFeatured: 2, prestige: 2, minDaysAhead: 1 },
   talk: { label: 'Artist talk', short: 'Talk', baseCost: 400, baseAttendance: 25, minFeatured: 1, maxFeatured: 1, prestige: 1, minDaysAhead: 1 },
   gala: { label: 'Gala', short: 'Gala', baseCost: 6_000, baseAttendance: 150, minFeatured: 2, maxFeatured: 4, prestige: 8, minDaysAhead: 5 },
+  auction: { label: 'Auction night', short: 'Auction', baseCost: 2_500, baseAttendance: 45, minFeatured: 0, maxFeatured: 0, prestige: 3, minDaysAhead: 3 },
 };
 
 /** The clock. The game runs in real time; the player can pause or speed it up. */
@@ -155,6 +156,84 @@ export const RULES = {
   gallerySaleChance: 0.05,
   /** Cash floor before the game ends. */
   overdraftLimit: -5_000,
+  /** Dealers are the priciest way to buy: asking price is value times this (before friend discounts). */
+  dealerMarkup: 1.3,
+};
+
+// ---- Starting collections ------------------------------------------------------
+
+export interface CollectionConfig {
+  label: string;
+  note: string;
+  /** Works you start with. */
+  works: number;
+  /** Artists the works are drawn from, by fame. */
+  fame: [number, number];
+  /** Strength of the pieces (grade range). */
+  grade: [number, number];
+  /** Starting cash multiplier: the family's lawyers and the estate take their share. */
+  cash: number;
+}
+
+export const COLLECTION: Record<'personal' | 'family', CollectionConfig> = {
+  personal: {
+    label: 'Your own collection',
+    note: 'A couple of pieces you bought over the years. You keep all your cash.',
+    works: 2,
+    fame: [10, 45],
+    grade: [0.85, 1.1],
+    cash: 1,
+  },
+  family: {
+    label: 'The family collection',
+    note: 'A storeroom of inherited work, a big name or two among it. Death duties take half your cash.',
+    works: 8,
+    fame: [15, 80],
+    grade: [0.9, 1.3],
+    cash: 0.5,
+  },
+};
+
+// ---- Auctions --------------------------------------------------------------------
+
+export const AUCTION = {
+  houses: ['Harrow & Finch', 'Calloway Rooms', 'Marchetti & Sons', 'The Lindqvist Saleroom'],
+  /** Weekday of the sale (0 = Monday). */
+  weekday: 3,
+  lots: 5,
+  /** Lots lean toward established names: artists below this fame are rarely consigned. */
+  minFame: 15,
+  /** Estimate as a share of value. */
+  estimate: [0.8, 1.2] as [number, number],
+  /** Reserve as a share of the low estimate. */
+  reserve: 0.8,
+  /** Bidding opens at this share of the low estimate. */
+  opening: 0.5,
+  /** The room's ceiling as a share of value. Below 1 on average: auctions are where bargains are. */
+  room: [0.55, 1.3] as [number, number],
+  /** Buyer's premium on top of the hammer price. */
+  buyersPremium: 0.15,
+};
+
+/** Bid increments, auction-house style. */
+export function bidIncrement(bid: number): number {
+  return bid < 2_000 ? 100 : bid < 10_000 ? 250 : bid < 25_000 ? 500 : bid < 100_000 ? 1_000 : 5_000;
+}
+
+/** Hosting an auction night: collectors consign work, you keep a commission on what sells. */
+export const HOSTED_AUCTION = {
+  /** Lots at reputation 0, plus one per this much reputation. */
+  baseLots: 4,
+  repPerLot: 15,
+  maxLots: 10,
+  /** Your cut of each hammer price (seller's commission plus your share of the premium). */
+  commission: 0.12,
+  /** Days between two auction nights: collectors need time to consign. */
+  minDaysBetween: 7,
+  /** Hammer as a share of the lot's value, before the room's mood. */
+  hammer: [0.6, 1.25] as [number, number],
+  /** Below this share of value the consignor's reserve isn't met and the lot goes unsold. */
+  reserve: 0.7,
 };
 
 export interface FixtureConfig {

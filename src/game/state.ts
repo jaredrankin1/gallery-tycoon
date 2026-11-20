@@ -1,11 +1,13 @@
 import { ARTIST_SEEDS, type ArtistSeed } from '../data/artists';
 import { DIFFICULTY, VENUE } from './config';
-import type { Artist, Difficulty, GameState, Id, VenueType } from './types';
+import type { Artist, Difficulty, GameState, Id, StartingCollection, VenueType } from './types';
 import { clamp, Rng } from './rng';
 import { createFloor } from './systems/floor';
 import { GUEST_SEEDS } from '../data/guests';
 import { refreshMarket } from './systems/market';
 import { createShop } from './systems/shop';
+import { createSale, nextSaleDay } from './systems/auctions';
+import { grantStartingCollection } from './systems/collection';
 import { emptyDay } from './clock';
 import { CAREER, RULES, TIME } from './config';
 
@@ -16,6 +18,8 @@ export interface NewGameOptions {
   seed?: number;
   /** Marisol hangs new art herself. Off unless asked for (the game's new-game screen turns it on). */
   autoHang?: boolean;
+  /** Art you start out owning. Defaults to none. */
+  collection?: StartingCollection;
 }
 
 export function createNewGame(opts: NewGameOptions): GameState {
@@ -63,6 +67,9 @@ export function createNewGame(opts: NewGameOptions): GameState {
   const rng = new Rng(state.rng);
   refreshMarket(state, rng, RULES.marketSize);
   state.rng = rng.state;
+  // Own streams, so choosing a collection doesn't reshuffle the rest of the run.
+  grantStartingCollection(state, opts.collection ?? 'none', new Rng(seed ^ 0xc011));
+  state.auction = createSale(state, nextSaleDay(state.day + 1), new Rng(seed ^ 0xa0c7));
   return state;
 }
 

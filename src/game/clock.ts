@@ -8,6 +8,7 @@ import { resolveEvent } from './systems/events';
 import { notify } from './systems/feed';
 import { post } from './systems/ledger';
 import { refreshMarket } from './systems/market';
+import { auctionEndOfDay } from './systems/auctions';
 import { shopEndOfDay, shopSales } from './systems/shop';
 import { hourOfGuests } from './systems/visits';
 import type { DayReport, GameState } from './types';
@@ -78,6 +79,7 @@ function endOfDay(state: GameState, rng: Rng): void {
   endOfDayCareers(state, rng);
   endOfDayExhibition(state);
   shopEndOfDay(state);
+  auctionEndOfDay(state);
   state.buzz *= GUESTS.buzzDecay;
 
   state.history.push(state.today);

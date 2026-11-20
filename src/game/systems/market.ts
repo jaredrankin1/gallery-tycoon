@@ -43,7 +43,7 @@ export function refreshMarket(state: GameState, rng: Rng, count: number = RULES.
     const artist = rng.pick(weighted);
     const grade = rollGrade(artist, rng);
     const value = workValue(artist, { grade });
-    const price = Math.round((value * diff.artPriceMultiplier * (1 - friendDiscount(artist))) / 50) * 50;
+    const price = Math.round((value * RULES.dealerMarkup * diff.artPriceMultiplier * (1 - friendDiscount(artist))) / 50) * 50;
     const id = `w-${state.nextId++}`;
     // Real works first.
     const { hasCatalogue, painting } = freshPainting(state, artist, rng);
