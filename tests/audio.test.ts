@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { whisper } from '../src/audio/whisper';
+import { laugh, PERSONAS, whisper } from '../src/audio/whisper';
 
 describe('gallery whispers', () => {
   it('makes a clean, quiet-edged snippet', () => {
@@ -49,5 +49,41 @@ describe('gallery whispers', () => {
 
   it('is the same every time for a seed', () => {
     expect(whisper(8000, 9)).toEqual(whisper(8000, 9));
+  });
+
+  it('has five distinct voice personas', () => {
+    expect(PERSONAS.length).toBe(5);
+    expect(new Set(PERSONAS.map((p) => p.mouth)).size).toBe(5);
+    // Different mouths give different brightness: count zero crossings.
+    const zc = (w: Float32Array) => {
+      let z = 0;
+      for (let i = 1; i < w.length; i++) if (w[i - 1] < 0 !== w[i] < 0) z++;
+      return z / w.length;
+    };
+    const avg = (p: number) => {
+      let s = 0;
+      for (let k = 1; k <= 8; k++) s += zc(whisper(16000, k * 7, PERSONAS[p]));
+      return s / 8;
+    };
+    // The small-mouthed bright voice is brighter than the gentleman.
+    expect(avg(0)).toBeGreaterThan(avg(1));
+  });
+
+  it('laughs softly and cleanly', () => {
+    for (let seed = 1; seed <= 15; seed++) {
+      const w = laugh(16000, seed);
+      let peak = 0;
+      let finite = true;
+      for (const x of w) {
+        finite &&= Number.isFinite(x);
+        peak = Math.max(peak, Math.abs(x));
+      }
+      expect(finite).toBe(true);
+      expect(peak).toBeGreaterThan(0.05);
+      expect(peak).toBeLessThanOrEqual(0.91);
+      expect(Math.abs(w[0])).toBeLessThan(0.01);
+      expect(Math.abs(w[w.length - 1])).toBeLessThan(0.01);
+      expect(w.length / 16000).toBeLessThan(2);
+    }
   });
 });
