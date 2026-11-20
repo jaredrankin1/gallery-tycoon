@@ -15,6 +15,7 @@ import {
   type Segment,
 } from '../game';
 import { crowdAtlas, preloadSprites, spriteScale, SPRITES } from './sprites';
+import { cutoutMotion, drawCutout } from './cutout';
 import { paintingImage, preloadPaintings } from './paintings';
 
 /** Sculpture sprites are cut at this many times their size on the floor (for sharp zoom). */
@@ -763,38 +764,23 @@ export class IsoRenderer {
     ctx.stroke();
   }
 
-  /** One guest: sprite frame, shadow, mood bubble, and a name tag when selected. */
+  /** One guest: a hopping paper cutout, mood bubble, and a name tag when selected. */
   private drawGuest(v: GuestVisit, pose: NonNullable<ReturnType<typeof poseAt>>, t: number) {
     const s = this.state!;
     const g = s.guests[v.guestId];
     const sprite = v.look?.sprite ?? g?.sprite;
     const meta = sprite && SPRITES[sprite];
     if (!meta) return;
-    const img = crowdAtlas(sprite, v.look?.variant ?? 0);
     const ctx = this.ctx;
     const { seg, local } = pose;
-    const [row, frames] = meta.anims[seg.anim];
     const dur = seg.end - seg.start;
-    // Loops for walking, idling and chatting; one-shot (hold last frame) for reactions.
-    const looping = seg.anim === 'walk' || seg.anim === 'idle' || seg.anim === 'chat';
-    const perHour = seg.anim === 'walk' ? 15 : 6;
-    const frame = looping ? Math.floor(local * perHour) % frames : Math.min(frames - 1, Math.floor((local / Math.max(0.01, dur)) * frames));
-
+    // Visitors are flat paper cutouts: one still pose per action, hopping as they go.
+    const dist = Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y);
+    const motion = cutoutMotion(seg.anim, local, dist, dur > 0 ? local / dur : 1);
     const [cw, ch] = meta.cell;
     const scale = spriteScale(meta);
     const p = toScreen(pose.x, pose.y);
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, 11, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (img) {
-      ctx.save();
-      ctx.translate(p.x, p.y + 2);
-      if (seg.faceLeft) ctx.scale(-1, 1);
-      ctx.drawImage(img, frame * cw, row * ch, cw, ch, (-cw * scale) / 2, -ch * scale, cw * scale, ch * scale);
-      ctx.restore();
-    }
+    drawCutout(ctx, { sprite, variant: v.look?.variant ?? 0, anim: seg.anim, at: p, faceLeft: seg.faceLeft, motion });
 
     // Hit box in canvas pixels.
     const sx = this.origin.x + this.pan.x;
@@ -809,7 +795,7 @@ export class IsoRenderer {
     });
 
     // Mood bubble while reacting.
-    const top = p.y - ch * scale - 6;
+    const top = p.y - ch * scale - 6 - motion.lift;
     const bubble =
       seg.anim === 'impressed' ? { text: '♥', color: '#e2557a' } : seg.anim === 'think' ? { text: '…', color: '#8a7f73' } : seg.anim === 'disapprove' ? { text: '✕', color: '#b5483f' } : null;
     if (bubble) {
@@ -825,7 +811,7 @@ export class IsoRenderer {
       ctx.fillText(bubble.text, p.x + 10, top - 3.5 + bob);
       ctx.textBaseline = 'alphabetic';
     }
-    if (seg.anim === 'photo' && frame === 2) {
+    if (seg.anim === 'photo' && local > dur * 0.4 && local < dur * 0.55) {
       if (this.once(`ph:${v.guestId}@${v.start}@${seg.start}`)) this.onSfx('shutter');
       ctx.fillStyle = 'rgba(255,255,240,0.5)';
       ctx.beginPath();
