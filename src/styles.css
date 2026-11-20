@@ -576,3 +576,8 @@ canvas.portrait { object-fit: contain; }
 .reply:active:not(:disabled) { background: var(--yellow); transform: translate(0.4cqw, 0.4cqw); }
 .reply.buy::before { background: var(--red); border-radius: 50%; }
 .reply small { display: block; color: var(--bad); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68em; margin-top: 0.6cqw; }
+
+/* An artist showing you work: the whole piece, never cropped to a banner. */
+.talk-work .thumb.lg, .talk-works.n1 .talk-work .thumb.lg { height: auto; aspect-ratio: auto; display: flex; justify-content: center; }
+.talk-work .thumb.lg.img img { width: auto; max-width: 100%; height: auto; max-height: 56cqw; object-fit: contain; }
+.talk-works.n2 .talk-work .thumb.lg.img img { max-height: 40cqw; }
