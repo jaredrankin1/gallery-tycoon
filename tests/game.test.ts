@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ARTIST_SEEDS } from '../src/data/artists';
+import { PAINTINGS } from '../src/data/paintings';
 import { SCULPTURES } from '../src/data/sculptures';
 import { assistantPose, fitsOn, createNewGame, dispatch, DIFFICULTY, poseAt, tasteScore, TIME, visitTimeline, workTags, type Action, type GameState } from '../src/game';
 
@@ -305,6 +306,19 @@ describe('gallery assistant', () => {
     const b = assistantPose(s, 3.5);
     expect([a.x, a.y]).toEqual([b.x, b.y]);
     expect(['idle', 'radio']).toContain(a.anim);
+  });
+});
+
+describe('paintings', () => {
+  it('every catalogued painting has an image, a known artist and a unique key', () => {
+    const files = new Set(Object.keys(import.meta.glob('../src/assets/art/*.jpg')).map((f) => f.replace(/^.*\/|\.jpg$/g, '')));
+    const ids = new Set(ARTIST_SEEDS.map((a) => a.id));
+    expect(PAINTINGS.length).toBe(140);
+    expect(new Set(PAINTINGS.map((p) => p.image)).size).toBe(PAINTINGS.length);
+    for (const w of PAINTINGS) {
+      expect(files.has(w.image), w.image).toBe(true);
+      expect(ids.has(w.artistId), w.artistId).toBe(true);
+    }
   });
 });
 

@@ -5,7 +5,8 @@ import type { Guest } from '../game/types';
 //   painting, portrait, figurative, moody, classic, sculpture, industrial,
 //   experimental, rough, digital, colorful, pop, trendy, landscape, quiet,
 //   installation, minimal, prestige, geometric, retro, print, weird,
-//   illustration, fantasy, organic, ceramic, textile, toy, americana
+//   illustration, fantasy, organic, ceramic, textile, toy, americana,
+//   photography, animals
 export type GuestSeed = Omit<Guest, 'affinity' | 'visits' | 'lastVisitDay' | 'knownLikes' | 'knownDislikes'>;
 
 export const GUEST_SEEDS: GuestSeed[] = [
