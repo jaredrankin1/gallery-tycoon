@@ -1,6 +1,6 @@
 import { TAG_LABEL, type GameState, type Guest } from '../../game';
 import { portraitUrl } from '../../render/sprites';
-import { RelationshipBar, Seg, Sheet } from '../bits';
+import { RelationshipBar, Sheet } from '../bits';
 import { useGame } from '../context';
 import { ArtistList } from './Artists';
 import { StaffList } from './Staff';
@@ -97,20 +97,13 @@ function GuestList() {
   );
 }
 
+const PEOPLE_TITLE = { guests: 'Visitors', artists: 'Artists', staff: 'Staff' } as const;
+
+/** One list at a time, opened from the inbox (or a guest's card): no tabs to juggle. */
 export function PeopleSheet() {
   const { ui, setUi } = useGame();
   return (
-    <Sheet title="People" onClose={() => setUi({ sheet: null })}>
-      <Seg
-        options={[
-          { value: 'guests', label: 'Visitors' },
-          { value: 'artists', label: 'Artists' },
-          { value: 'staff', label: 'Staff' },
-        ]}
-        value={ui.peopleTab}
-        onPick={(v) => setUi({ peopleTab: v })}
-      />
-      <div class="gap" />
+    <Sheet title={PEOPLE_TITLE[ui.peopleTab]} onClose={() => setUi({ sheet: null })}>
       {ui.peopleTab === 'guests' ? <GuestList /> : ui.peopleTab === 'staff' ? <StaffList /> : <ArtistList />}
     </Sheet>
   );

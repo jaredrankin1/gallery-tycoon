@@ -93,7 +93,7 @@ export function Inspector() {
                   : 'What’s in storage needs a pedestal, not a wall.'
                 : 'Nothing in storage. Buy something first.'}
             </p>
-            <button class="btn primary" onClick={() => setUi({ sheet: 'collection', selected: null })}>
+            <button class="btn primary" onClick={() => setUi({ sheet: 'collection', artTab: 'owned', selected: null })}>
               Browse art for sale
             </button>
           </>

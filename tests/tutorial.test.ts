@@ -13,7 +13,7 @@ const fresh = () => {
   startTutorial(s);
   return s;
 };
-const ui = { sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', eventsTab: 'show', talk: false } as const;
+const ui = { sheet: null, build: null, building: false, selected: null, draft: null, guest: null, peopleTab: 'guests', artTab: 'market', talk: false } as const;
 
 describe("Marisol's opening-week tour", () => {
   it('has as many tasks as the game expects', () => {

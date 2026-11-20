@@ -3,7 +3,8 @@ import { useContext } from 'preact/hooks';
 import type { Action, EventKind, FixtureKind, GameState, HospitalityPlan, Id } from '../game';
 import type { Store } from './store';
 
-export type SheetId = 'collection' | 'people' | 'events' | 'books' | 'shop';
+/** Dock sheets (art, calendar, inbox), plus books (tap the cash), the shop (tap the counter) and people (from the inbox or the floor). */
+export type SheetId = 'collection' | 'calendar' | 'inbox' | 'people' | 'books' | 'shop';
 /** 'remove' is the bulldozer tool in the build tray. */
 export type BuildTool = FixtureKind | 'remove';
 
@@ -24,10 +25,10 @@ export interface Ui {
   draft: EventDraft | null;
   /** Guest tapped on the floor (shows their card). */
   guest: string | null;
-  /** Which list the People sheet shows. */
+  /** Which list the People sheet shows (each opens as its own sheet, no tabs). */
   peopleTab: 'guests' | 'artists' | 'staff';
-  /** Which half of the Events sheet: the themed show, or one-night events. */
-  eventsTab: 'show' | 'events';
+  /** Which works the Art sheet lists. */
+  artTab: 'market' | 'auction' | 'owned';
   /** Talking to the artist who dropped by. */
   talk: boolean;
 }
@@ -39,6 +40,7 @@ export interface GameCtx {
   setUi: (patch: Partial<Ui>) => void;
   /** Runs an action; toasts the error and returns false if refused. */
   act: (a: Action) => boolean;
+  /** Puts a line in the news ticker (errors flash red). */
   toast: (text: string, tone?: 'error' | 'info') => void;
 }
 

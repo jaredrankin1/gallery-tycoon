@@ -215,8 +215,7 @@ function ArtistCard({ a }: { a: Artist }) {
             disabled={a.relationship < 0}
             onClick={() =>
               setUi({
-                sheet: 'events',
-                eventsTab: 'events',
+                sheet: 'calendar',
                 draft: {
                   kind: 'opening',
                   day: state.day + EVENT_KIND.opening.minDaysAhead,
