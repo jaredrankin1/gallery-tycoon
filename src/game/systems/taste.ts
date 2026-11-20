@@ -71,4 +71,6 @@ export const TAG_LABEL: Record<string, string> = {
   textile: 'fibre art',
   toy: 'designer toys',
   americana: 'Americana',
+  photography: 'photography',
+  animals: 'animals',
 };

@@ -44,6 +44,18 @@ export const ARTIST_TALK: Record<Id, ArtistVoiceSeed> = {
     speaker: 'Signora Castellani',
     greeting: 'Buongiorno. The family asked me to see where Great-uncle Aurelio might live next. He is very particular.',
   },
+  'a-pim': { look: { sprite: 'kofi', variant: 2 }, greeting: 'Hey! Okay, this one is nine hundred and twelve polygons. I counted. Twice.' },
+  'a-saskia': { look: { sprite: 'beatrix', variant: 3 }, greeting: 'Good evening. I brought a still life. Nothing in it is alive, which is rather the point.' },
+  'a-agnes': { look: { sprite: 'amara', variant: 1 }, greeting: 'Salve. Forgive the gold leaf on my sleeves. It gets everywhere, like glitter for monks.' },
+  'a-vell': {
+    look: { sprite: 'dot', variant: 3 },
+    speaker: 'Cornelia Vell',
+    greeting: 'How do you do. Great-great-grandpapa painted this one from a rowing boat, in a thunderstorm. The family would like it seen.',
+  },
+  'a-lena': { look: { sprite: 'hana', variant: 3 }, greeting: 'Hi. Sorry, I smell like fixer. I printed this one at four this morning and it was finally right.' },
+  'a-boone': { look: { sprite: 'edmund', variant: 2 }, greeting: 'Howdy. Mind the spurs, they’re staying on. Brought you a little piece of the range.' },
+  'a-ezra': { look: { sprite: 'fen', variant: 3 }, greeting: 'Oh. Hi. It’s brighter in here than in my paintings. That’s okay. I brought some dusk with me.' },
+  'a-lupe': { look: { sprite: 'sunny', variant: 1 }, greeting: 'Ciao! Careful, the corner’s still wet. Go on, you can touch the other end. Everybody does.' },
 };
 
 /** Look for an artist with no entry above (new seeds): a stable pick from the visitor sheets. */

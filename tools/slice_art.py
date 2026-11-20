@@ -10,6 +10,12 @@ Writes src/assets/art/<sheet>-<n>.jpg (n = 1..10, left to right, top to bottom).
 TILE_SHEETS are a different layout: 5x2 unframed canvases edge to edge,
 split by thin white gutters. We find the gutters and keep each canvas whole,
 landscape and all (the game sizes the frame to the picture).
+
+GRID_SHEETS are evenly spaced grids whose cells may carry a baked-in frame
+(gold mouldings, pixel-art borders) or sit on a coloured gutter. Each cell is
+trimmed from every side, line by line, while the line is still mostly frame
+or gutter, and then a little more, so only the picture is left. The game draws
+its own frame.
 """
 from pathlib import Path
 
@@ -61,6 +67,96 @@ def slice_tiles(name):
             art.save(OUT / f'{name}-{n}.jpg', quality=84, optimize=True)
 
 
+# name: (columns, rows, ground, frame width in source px, output width)
+# Each cell is first trimmed of its ground ('dark', 'black' or 'light' gutter lines),
+# then the baked-in frame, the same width on every side, is cut off.
+GRID_SHEETS = {
+    'lowpoly': (5, 2, 'black', 2, 300),
+    'stilllife': (5, 2, 'dark', 13, 300),
+    'medieval': (5, 2, 'dark', 38, 300),
+    'romantic': (5, 2, 'dark', 20, 300),
+    'bwphoto': (5, 2, 'black', 2, 300),
+    'western': (5, 2, 'light', 2, 300),
+    'pixelland': (5, 2, 'dark', 16, 300),
+    'impasto': (2, 5, 'light', 8, 600),
+}
+
+
+def ground_mask(px, kind):
+    """True where a pixel is gutter rather than frame or picture."""
+    total = px.sum(2)
+    if kind == 'light':
+        return (total > 690) & (np.abs(px[..., 0] - px[..., 2]) < 30)
+    if kind == 'black':  # pure black gutters around pictures that can be dark themselves
+        return total < 12
+    return total < 100
+
+
+def trim_cell(px, kind, inset):
+    """(left, top, right, bottom) of the picture inside one cell."""
+    mask = ground_mask(px, kind)
+    h, w = mask.shape
+
+    def edge(lines, n):
+        # Past the last gutter line, stepping over a stray seam or two.
+        last = -1
+        for i in range(n // 3):
+            if lines(i).mean() > 0.5:
+                last = i
+            elif i - last > 4:
+                break
+        return last + 1 + inset
+
+    left = edge(lambda i: mask[:, i], w)
+    right = w - edge(lambda i: mask[:, w - 1 - i], w)
+    top = edge(lambda i: mask[i, :], h)
+    bottom = h - edge(lambda i: mask[h - 1 - i, :], h)
+    return left, top, right, bottom
+
+
+def bands(gutter, count, size):
+    """Picture spans along one axis, split at gutter lines; even split if they don't add up."""
+    out, start = [], None
+    for i, g in enumerate(list(gutter) + [True]):
+        if not g and start is None:
+            start = i
+        elif g and start is not None:
+            if i - start > 60:
+                out.append((start, i))
+            start = None
+    if len(out) != count:
+        step = size / count
+        out = [(round(k * step), round((k + 1) * step)) for k in range(count)]
+    return out
+
+
+def slice_grid(name, cols, rows, kind, inset, out_w):
+    im = Image.open(SRC / f'{name}.png').convert('RGB')
+    px = np.asarray(im, dtype=int)
+    ground = ground_mask(px, kind)
+    n = 0
+    # Columns across the whole sheet, then rows inside each column: some sheets
+    # are packed unevenly, and their rows don't line up from column to column.
+    # Dark grounds aren't searched: dark pictures would read as gutter.
+    find = kind == 'light'
+    col_spans = bands(ground.mean(0) > 0.9 if find else [], cols, im.width)
+    cells = {}
+    for c, (x0, x1) in enumerate(col_spans):
+        for r, (y0, y1) in enumerate(bands(ground[:, x0:x1].mean(1) > 0.9 if find else [], rows, im.height)):
+            cells[r, c] = (x0, y0, x1, y1)
+    for row in range(rows):
+        for col in range(cols):
+            n += 1
+            x0, y0, x1, y1 = cells[row, col]
+            if find:  # pad back out a little so the trim sees the gutter edge
+                x0, y0 = max(0, x0 - 4), max(0, y0 - 4)
+                x1, y1 = min(im.width, x1 + 4), min(im.height, y1 + 4)
+            l, t, r, b = trim_cell(px[y0:y1, x0:x1], kind, inset)
+            art = im.crop((x0 + l, y0 + t, x0 + r, y0 + b))
+            art = art.resize((out_w, round(out_w * art.height / art.width)), Image.LANCZOS)
+            art.save(OUT / f'{name}-{n}.jpg', quality=84, optimize=True)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for sheet in sorted(SRC.glob('sheet*.png')):
@@ -80,6 +176,8 @@ def main():
                 art.save(OUT / f'{sheet.stem}-{n}.jpg', quality=84, optimize=True)
     for name in TILE_SHEETS:
         slice_tiles(name)
+    for name, spec in GRID_SHEETS.items():
+        slice_grid(name, *spec)
     print('wrote', len(list(OUT.glob('*.jpg'))), 'paintings to', OUT)
 
 
