@@ -65,4 +65,28 @@ export const PAINTINGS: PaintingSeed[] = [
   { image: 'sheet3-8', title: 'The Cartographer', artistId: 'a-wren', tags: ['quiet'] },
   { image: 'sheet3-9', title: 'Rain Hat', artistId: 'a-wren' },
   { image: 'sheet3-10', title: 'Walking Out', artistId: 'a-wren', tags: ['landscape'] },
+
+  // Ruben Ashe: loud, raw neo-expressionism. Unframed canvases, landscape.
+  { image: 'neo-1', title: 'King of Nothing', artistId: 'a-ruben', tags: ['portrait'] },
+  { image: 'neo-2', title: 'Big Bad', artistId: 'a-ruben', tags: ['moody'] },
+  { image: 'neo-3', title: 'Sitting With It', artistId: 'a-ruben', tags: ['figurative'] },
+  { image: 'neo-4', title: 'Tar Beach, Noon', artistId: 'a-ruben', tags: ['landscape'] },
+  { image: 'neo-5', title: 'Head No. 9 (Pink)', artistId: 'a-ruben', tags: ['portrait'] },
+  { image: 'neo-6', title: 'Sunflowers, Shouting', artistId: 'a-ruben', tags: ['classic'] },
+  { image: 'neo-7', title: 'Crown in Orbit', artistId: 'a-ruben', tags: ['portrait', 'fantasy'] },
+  { image: 'neo-8', title: 'The Bull', artistId: 'a-ruben' },
+  { image: 'neo-9', title: 'Sunset Strip, Melting', artistId: 'a-ruben', tags: ['landscape', 'pop'] },
+  { image: 'neo-10', title: 'Memento, Loud', artistId: 'a-ruben', tags: ['moody'] },
+
+  // Della Price: photorealist Americana.
+  { image: 'photoreal-1', title: 'Freckles, August', artistId: 'a-della', tags: ['portrait'] },
+  { image: 'photoreal-2', title: 'Lipstick on the Mug', artistId: 'a-della', tags: ['retro'] },
+  { image: 'photoreal-3', title: 'Last Gas for 90 Miles', artistId: 'a-della', tags: ['landscape', 'retro'] },
+  { image: 'photoreal-4', title: 'Two Fingers, Neat', artistId: 'a-della', tags: ['moody'] },
+  { image: 'photoreal-5', title: 'Rooftop Dusk, Manhattan', artistId: 'a-della', tags: ['landscape'] },
+  { image: 'photoreal-6', title: 'Dollar Slice', artistId: 'a-della', tags: ['pop'] },
+  { image: 'photoreal-7', title: 'Sunday, Unmade', artistId: 'a-della' },
+  { image: 'photoreal-8', title: 'Tony in Aviators', artistId: 'a-della', tags: ['portrait', 'retro'] },
+  { image: 'photoreal-9', title: 'Peonies in a Jar', artistId: 'a-della', tags: ['classic'] },
+  { image: 'photoreal-10', title: 'Airstream at Golden Hour', artistId: 'a-della', tags: ['retro', 'landscape'] },
 ];

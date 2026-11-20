@@ -1,7 +1,7 @@
 """Cut the sculpture sheets in art/source/sculptures/ into one sprite per piece.
 
-Every sheet is a 5x2 grid of pieces (2172x724). Four sheets (geometric, organic, salvage, pop) come with each
-piece already standing on a plinth with a brass plaque, on a transparent
+Every sheet is a 5x2 grid of pieces (2172x724). Four sheets (geometric,
+organic, salvage, pop) come with each piece already standing on a plinth with a brass plaque, on a transparent
 background. The rest need extra work:
 
   brutalist.png  no alpha at all: the pieces sit on a light checkerboard,
@@ -13,6 +13,9 @@ background. The rest need extra work:
   vinyl.png, toys.png, marble.png
                  designer toys (glossy and matte) and classical busts,
                  transparent, no plinths.
+  western.png    bronzes on a plain white background, no alpha: removed the
+                 same way as the checkerboard. Their cast rock bases are kept
+                 and stood on the plinth.
 
 So that every sculpture stands the same way in the game, pieces without a
 plinth get one: the plinth from organic.png piece 2 is cut out once and the
@@ -25,8 +28,8 @@ of every transparent pixel so nothing bleeds in when the sprite is scaled.
     python3 tools/slice_sculpture.py
 
 Writes src/assets/sculpture/<sheet>-<n>.png (n = 1..10, left to right, top
-to bottom). The plinth's top edge is at the same height above the bottom of
-every sprite (PLINTH_TOP_FRAC of the sprite's plinth), which the renderer uses.
+to bottom). Every sprite's bottom edge is the front of its plinth, which is
+where the renderer stands it on the floor.
 """
 import os
 import sys
@@ -42,10 +45,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / 'art' / 'source' / 'sculptures'
 OUT = ROOT / 'src' / 'assets' / 'sculpture'
 
-SHEETS = ['geometric', 'organic', 'salvage', 'pop', 'brutalist', 'ceramic', 'textile', 'vinyl', 'toys', 'marble']
-NO_PLINTH = {'brutalist', 'ceramic', 'textile', 'vinyl', 'toys', 'marble'}
+SHEETS = ['geometric', 'organic', 'salvage', 'pop', 'brutalist', 'ceramic', 'textile', 'vinyl', 'toys', 'marble', 'western']
+NO_PLINTH = {'brutalist', 'ceramic', 'textile', 'vinyl', 'toys', 'marble', 'western'}
 # Textile pieces that hang on a wall instead: no plinth, drawn flat on the wall.
 WALL = {('textile', n) for n in (1, 3, 4, 7, 9, 10)}
+# Enclosed background patches at least this big are holes, not paint. Bronze
+# has no white anywhere, so even the gaps between wheel spokes can go.
+HOLE_MIN = {'western': 12}
 COLS, ROWS = 5, 2
 ALPHA_MIN = 48     # below this a pixel is fringe, not sculpture
 MIN_PART = 150     # smaller blobs are specks
@@ -55,13 +61,13 @@ PLINTH_H = 68      # bottom rows of that piece that are plinth, in sheet pixels
 PLINTH_LID = 18    # top rows of it: the plinth's top face, where the piece stood
 
 
-def checker_alpha(rgb):
+def checker_alpha(rgb, hole_min=400):
     """Alpha for a sheet drawn on a light grey checkerboard."""
     lo, hi = rgb.min(2), rgb.max(2)
     bgish = (lo >= 228) & (hi - lo <= 14)
     lab, sizes = label(bgish)
     edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
-    big = {i for i in range(1, len(sizes)) if sizes[i] >= 400}
+    big = {i for i in range(1, len(sizes)) if sizes[i] >= hole_min}
     bg = np.isin(lab, list(edge | big))
     # Pull the cut in one pixel so no pale anti-aliasing is left on the outline.
     grown = bg.copy()
@@ -78,7 +84,7 @@ def load(name):
         a = np.array(im)
     else:
         rgb = np.array(im.convert('RGB'))
-        a = np.dstack([rgb, checker_alpha(rgb.astype(int))])
+        a = np.dstack([rgb, checker_alpha(rgb.astype(int), HOLE_MIN.get(name, 400))])
     a[a[..., 3] < ALPHA_MIN] = 0
     return a
 
