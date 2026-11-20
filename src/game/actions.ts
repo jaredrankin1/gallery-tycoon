@@ -8,10 +8,12 @@ import { endPatronage, setStipend, signPatron, wardOffRival } from './systems/pa
 import { chargeEvent, eventCost } from './systems/events';
 import { canPlace, fitsOn, freeDisplayFixture, noSpotFor, unhang } from './systems/floor';
 import { post } from './systems/ledger';
+import { notify } from './systems/feed';
 import { openingStock, orderStock, shelfSpace } from './systems/shop';
 import { hostedAuctionTooSoon, passLot, placeBid } from './systems/auctions';
+import { appraiserDiscount, hire, hired, letGo } from './systems/staff';
 import { stepHour } from './clock';
-import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, MerchKind, StipendTier } from './types';
+import type { BudgetPlan, EventKind, ExhibitionTheme, FixtureKind, GameState, HospitalityPlan, Id, MerchKind, StaffRole, StipendTier } from './types';
 import { getVenueModel } from './venues';
 import { absHour } from './systems/visits';
 
@@ -44,6 +46,9 @@ export type Action =
   /** Auction house sale: raise your paddle on a lot (one increment), or let it go. */
   | { type: 'auctionBid'; lot: number }
   | { type: 'auctionPass'; lot: number }
+  /** Staff: take someone on (replacing whoever holds that job), or let them go. */
+  | { type: 'hireStaff'; candidateId: string }
+  | { type: 'letGoStaff'; role: StaffRole }
   /** Advance the clock by some hours. The real-time loop sends this. */
   | { type: 'tick'; hours: number };
 
@@ -69,9 +74,16 @@ function apply(state: GameState, action: Action): string | void {
     case 'buyArtwork': {
       const work = state.artworks[action.artworkId];
       if (!work || work.status !== 'offered') return 'That work is no longer available.';
-      if (state.cash - work.price < RULES.overdraftLimit) return 'You can’t afford that.';
-      post(state, 'art', -work.price, `Bought "${work.title}"`);
-      work.acquiredFor = work.price;
+      // An appraiser on staff talks the dealer down.
+      const cut = Math.round((work.price * appraiserDiscount(state)) / 10) * 10;
+      const paid = work.price - cut;
+      if (state.cash - paid < RULES.overdraftLimit) return 'You can’t afford that.';
+      post(state, 'art', -paid, `Bought "${work.title}"`);
+      if (cut > 0) {
+        const who = hired(state, 'appraiser')!.who.name.split(' ')[0];
+        notify(state, { kind: 'staff', text: `${who} talked the dealer down $${cut.toLocaleString('en-US')} on “${work.title}”.` });
+      }
+      work.acquiredFor = paid;
       work.price = Math.round((work.value * state.settings.defaultMarkup) / 50) * 50;
       work.status = 'storage';
       work.day = state.day;
@@ -235,6 +247,10 @@ function apply(state: GameState, action: Action): string | void {
       return placeBid(state, action.lot);
     case 'auctionPass':
       return passLot(state, action.lot);
+    case 'hireStaff':
+      return hire(state, action.candidateId);
+    case 'letGoStaff':
+      return letGo(state, action.role);
     case 'tick': {
       const rng = new Rng(state.rng);
       for (let i = 0; i < action.hours && state.status === 'playing'; i++) {

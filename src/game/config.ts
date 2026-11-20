@@ -1,4 +1,4 @@
-import type { Difficulty, EventKind, FixtureKind, HospitalityTier, MerchKind, VenueType } from './types';
+import type { Difficulty, EventKind, FixtureKind, HospitalityTier, MerchKind, StaffRole, VenueType } from './types';
 
 // All tuning numbers live here so balancing never means hunting through systems.
 
@@ -484,4 +484,61 @@ export const MOODS = {
   browseHours: [0.12, 0.3] as const,
   /** Walking pace varies person to person, as a multiple of GUESTS.walkTilesPerHour. */
   paceRange: [0.75, 1.2] as const,
+};
+
+// ---- Hired staff -------------------------------------------------------------
+
+export interface StaffRoleConfig {
+  label: string;
+  /** What they do, in a line, for the hiring card. */
+  duty: string;
+  /** Weekly wage at skill 2. */
+  salary: number;
+}
+
+export const STAFF_ROLES: Record<StaffRole, StaffRoleConfig> = {
+  security: { label: 'Security guard', duty: 'Stops theft, damage and shoplifting', salary: 700 },
+  appraiser: { label: 'Art appraiser', duty: 'Talks dealers down, and buyers trust an appraised work', salary: 1_400 },
+  curator: { label: 'Assistant curator', duty: 'Makes exhibitions and events land better', salary: 1_200 },
+  intern: { label: 'Intern', duty: 'Minds the gift shop and posts about you every day', salary: 250 },
+};
+
+export const STAFF = {
+  /** Wage multiplier by skill (index 1..3). */
+  salaryBySkill: [0, 0.8, 1, 1.35],
+  /** Effect multiplier by skill (index 1..3). */
+  effectBySkill: [0, 0.7, 1, 1.3],
+  /** Appraiser: off the asking price of every dealer-market purchase. */
+  appraiserDiscount: 0.08,
+  /** Appraiser: floor sale chance multiplier is 1 + this. */
+  appraiserSaleBoost: 0.15,
+  /** Assistant curator: added to an exhibition's synergy score. */
+  curatorSynergy: 0.08,
+  /** Assistant curator: added to event satisfaction. */
+  curatorEventSatisfaction: 0.06,
+  /** Intern: gift shop buy chance multiplier is 1 + this. */
+  internShopBoost: 0.15,
+  /** Intern: buzz from their daily posts. */
+  internDailyBuzz: 1.5,
+  /** Staff on the floor (not the guard) work these hours. */
+  dayStart: 8,
+  dayEnd: 21,
+};
+
+/** Trouble on the floor: rolled once a day. A guard stops most of it. */
+export const INCIDENTS = {
+  /** Daily chance before visitors... */
+  baseChance: 0.02,
+  /** ...plus this per visitor that day... */
+  perVisitor: 0.0008,
+  /** ...never more than this. */
+  maxChance: 0.12,
+  /** Share of incidents a skill-2 guard stops (times effectBySkill, capped at 0.95). */
+  guardStops: 0.75,
+  /** Damage knocks this share off the piece's grade (and so its value). */
+  damage: 0.12,
+  /** Odds by kind when nothing rules one out. Theft never gets past a guard. */
+  weights: { damage: 0.5, theft: 0.15, shoplift: 0.35 },
+  /** Units a shoplifter walks off with. */
+  shoplift: [3, 10] as [number, number],
 };

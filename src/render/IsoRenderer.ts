@@ -4,6 +4,7 @@ import {
   canPlace,
   poseAt,
   shortName,
+  staffPoses,
   Steering,
   TIME,
   visitTimeline,
@@ -13,6 +14,7 @@ import {
   type GameState,
   type GuestVisit,
   type Segment,
+  type StaffPose,
 } from '../game';
 import { crowdAtlas, preloadSprites, spriteScale, SPRITES } from './sprites';
 import { cutoutMotion, drawCutout } from './cutout';
@@ -391,6 +393,8 @@ export class IsoRenderer {
     const staff = assistantPose(s, now);
     if (performance.now() < this.cheerUntil && staff.anim !== 'walk') staff.anim = 'cheer';
     items.push({ depth: staff.x + staff.y, draw: () => this.drawAssistant(staff) });
+    // Hired staff: guard, appraiser, curator, intern. Not visitors, so not counted.
+    for (const p of staffPoses(s, now)) items.push({ depth: p.x + p.y, draw: () => this.drawStaff(p) });
     if (this.guestCount !== this.lastCount) {
       this.lastCount = this.guestCount;
       this.onCount(this.guestCount);
@@ -720,6 +724,30 @@ export class IsoRenderer {
     if (p.faceLeft) ctx.scale(-1, 1);
     ctx.drawImage(img, frame * cw, row * ch, cw, ch, (-cw * scale) / 2, -ch * scale, cw * scale, ch * scale);
     if (p.carrying) this.drawParcel(p.carrying, frame);
+    ctx.restore();
+  }
+
+  /** A hired staff member. Loops walking, riding and idling; one-shot poses hold their last frame. */
+  private drawStaff(p: StaffPose) {
+    const meta = SPRITES[p.sprite];
+    const img = meta && crowdAtlas(p.sprite, p.variant);
+    if (!meta || !img) return;
+    const [row, frames] = meta.anims[p.anim] ?? meta.anims.idle;
+    const looping = p.anim === 'walk' || p.anim === 'segway' || p.anim === 'idle' || p.anim === 'chat';
+    const perHour = p.anim === 'walk' || p.anim === 'segway' ? 15 : 6;
+    const frame = looping ? Math.floor(p.local * perHour) % frames : Math.min(frames - 1, Math.floor(p.local * 4));
+    const [cw, ch] = meta.cell;
+    const scale = spriteScale(meta);
+    const pt = toScreen(p.x, p.y);
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(pt.x, pt.y, 11, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(pt.x, pt.y + 2);
+    if (p.faceLeft) ctx.scale(-1, 1);
+    ctx.drawImage(img, frame * cw, row * ch, cw, ch, (-cw * scale) / 2, -ch * scale, cw * scale, ch * scale);
     ctx.restore();
   }
 

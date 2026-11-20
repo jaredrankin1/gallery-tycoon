@@ -25,7 +25,7 @@ export interface Ui {
   /** Guest tapped on the floor (shows their card). */
   guest: string | null;
   /** Which list the People sheet shows. */
-  peopleTab: 'guests' | 'artists';
+  peopleTab: 'guests' | 'artists' | 'staff';
   /** Which half of the Events sheet: the themed show, or one-night events. */
   eventsTab: 'show' | 'events';
   /** First-run tip pointing at the Art button. */

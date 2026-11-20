@@ -7,6 +7,7 @@ import { notify } from '../systems/feed';
 import { unhang } from '../systems/floor';
 import { post } from '../systems/ledger';
 import type { Artwork, GameState } from '../types';
+import { appraiserSaleBoost } from '../systems/staff';
 import type { VenueModel } from './types';
 
 /** Daily chance a displayed work sells, times `boost`. */
@@ -20,6 +21,7 @@ function saleChance(state: GameState, work: Artwork, boost: number): number {
       (0.6 + (artist?.fame ?? 0) / 100) *
       priceFactor *
       exhibitionSaleBoost(state, work) *
+      appraiserSaleBoost(state) *
       boost,
     0,
     0.9,

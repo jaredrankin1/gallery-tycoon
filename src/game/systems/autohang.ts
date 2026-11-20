@@ -6,6 +6,7 @@ import { notify } from './feed';
 import { canPlace, displayFixtures, fitsOn, unhang } from './floor';
 import { post } from './ledger';
 import { standSpot } from './visits';
+import { weeklySalaries } from './staff';
 
 // Auto-hang: with it on, Marisol deals with every new piece that comes in
 // (bought, or delivered by an artist) and works through anything else sitting
@@ -50,7 +51,7 @@ export function unpark(state: GameState, id: Id): void {
 export function buildReserve(state: GameState): number {
   const diff = DIFFICULTY[state.difficulty];
   const stipends = Object.values(state.artists).reduce((t, a) => t + (a.patron?.stipend ?? 0), 0);
-  const bills = diff.weeklyRent + diff.weeklyStaff + VENUE[state.venue].weeklyUpkeep + stipends;
+  const bills = diff.weeklyRent + diff.weeklyStaff + VENUE[state.venue].weeklyUpkeep + stipends + weeklySalaries(state);
   return Math.max(AUTO_HANG.cashReserve, Math.round(bills * AUTO_HANG.reserveWeeks));
 }
 
