@@ -24,6 +24,8 @@ import { paintingImage, preloadPaintings } from './paintings';
 
 /** How far past the screen's width the room may be drawn (1 = fits exactly). */
 const ROOM_OVERFLOW = 1.14;
+/** Share of the spare height above the room, where toasts show. */
+const TOAST_BAND = 0.6;
 
 /** Sculpture sprites are cut at this many times their size on the floor (for sharp zoom). */
 const SCULPTURE_SCALE = 2.8;
@@ -257,11 +259,12 @@ export class IsoRenderer {
     // Fill the screen: the room may run a little past the sides (the far wall
     // ends; drag to see them) rather than float small with empty space above.
     this.scale = Math.min((cw * ROOM_OVERFLOW) / b.w, ch / (b.h + 16));
-    // Any spare height goes mostly below the room, not above it.
+    // Spare height goes a little more above the room than below: that band
+    // under the top bar is where status updates and comments pop up.
     const spare = Math.max(0, ch - b.h * this.scale);
     this.origin = {
       x: cw / 2 - (b.left + b.w / 2) * this.scale,
-      y: top + spare * 0.3 - b.top * this.scale,
+      y: top + spare * TOAST_BAND - b.top * this.scale,
     };
   }
 

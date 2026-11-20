@@ -56,9 +56,10 @@ small { font-size: 0.8em; line-height: 1.35; }
   background: #1a1a1a linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 32px 32px,
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 32px 32px;
 }
+/* A 9:16 frame on wide screens; on phones taller than 9:16 it fills the whole
+   height (up to 9:21) instead of leaving dark bands above and below. */
 #app {
-  aspect-ratio: 9 / 16;
-  height: min(100cqh, calc(100cqw * 16 / 9));
+  height: min(100cqh, calc(100cqw * 21 / 9));
   width: min(100cqw, calc(100cqh * 9 / 16));
   position: relative;
   overflow: hidden;
@@ -601,3 +602,10 @@ canvas.portrait { object-fit: contain; }
 .talk-work .thumb.lg, .talk-works.n1 .talk-work .thumb.lg { height: auto; aspect-ratio: auto; display: flex; justify-content: center; }
 .talk-work .thumb.lg.img img { width: auto; max-width: 100%; height: auto; max-height: 56cqw; object-fit: contain; }
 .talk-works.n2 .talk-work .thumb.lg.img img { max-height: 40cqw; }
+
+/* People → Artists: one piece on each card, so you can see what they make. */
+.artist-sample { margin: 0; display: flex; align-items: center; gap: 3cqw; }
+.artist-sample .thumb.lg { flex: 0 0 34cqw; width: 34cqw; height: auto; aspect-ratio: auto; display: flex; justify-content: center; }
+.artist-sample .thumb.lg.img img { width: auto; max-width: 100%; height: auto; max-height: 34cqw; object-fit: contain; }
+.artist-sample figcaption { display: flex; flex-direction: column; gap: 0.8cqw; min-width: 0; }
+.artist-sample figcaption b { font-weight: 800; }
