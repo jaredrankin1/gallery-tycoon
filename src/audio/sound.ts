@@ -12,6 +12,21 @@ import { whisper } from './whisper';
 
 const PREF = 'agt.sound';
 
+/** Half a second of silent 8-bit mono WAV, built in code so nothing has to load. */
+const SILENCE = (() => {
+  const n = 4000;
+  const b = new Uint8Array(44 + n);
+  const v = new DataView(b.buffer);
+  const tag = (o: number, t: string) => [...t].forEach((c, i) => (b[o + i] = c.charCodeAt(0)));
+  tag(0, 'RIFF'); v.setUint32(4, 36 + n, true); tag(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  tag(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+  let bin = '';
+  b.forEach((x) => (bin += String.fromCharCode(x)));
+  return 'data:audio/wav;base64,' + btoa(bin);
+})();
+
 export type Sfx = 'door' | 'sale' | 'coin' | 'shutter' | 'clink' | 'tap' | 'event' | 'warn' | 'error' | 'note';
 
 function readPref(): boolean {
@@ -41,15 +56,15 @@ class Sound {
 
   /** Call once: starts audio on the first touch, pauses with the tab. */
   install() {
+    // iPhone Safari only lets audio start from touchend/click (not pointerdown),
+    // so listen on every gesture until the context is actually running.
+    const gestures = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
     const unlock = () => {
       this.start();
-      if (this.ctx?.state === 'running') {
-        window.removeEventListener('pointerdown', unlock, true);
-        window.removeEventListener('keydown', unlock, true);
-      }
+      this.unlockMedia();
+      if (this.ctx?.state === 'running') gestures.forEach((g) => window.removeEventListener(g, unlock, true));
     };
-    window.addEventListener('pointerdown', unlock, true);
-    window.addEventListener('keydown', unlock, true);
+    gestures.forEach((g) => window.addEventListener(g, unlock, true));
     // A soft tap on every button.
     window.addEventListener(
       'pointerdown',
@@ -65,6 +80,32 @@ class Sound {
     });
   }
 
+  private media: HTMLAudioElement | null = null;
+
+  /**
+   * iOS plays Web Audio on the ringer channel, so the silent switch mutes it.
+   * Asking for the "playback" session (Safari 16.4+), and on older iOS looping a
+   * silent <audio> element, moves the game onto the media channel like a video.
+   */
+  private unlockMedia() {
+    if (!this.enabled) return;
+    try {
+      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+      if (session && session.type !== 'playback') session.type = 'playback';
+    } catch {
+      /* not supported */
+    }
+    if (this.media) return;
+    const el = new Audio(SILENCE);
+    el.loop = true;
+    el.setAttribute('playsinline', '');
+    el.volume = 0;
+    this.media = el;
+    el.play().catch(() => {
+      this.media = null; // try again on the next tap
+    });
+  }
+
   subscribe(fn: () => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -77,7 +118,13 @@ class Sound {
     } catch {
       /* private mode: just don't remember */
     }
-    if (on) this.start();
+    if (on) {
+      this.start();
+      this.unlockMedia();
+    } else {
+      this.media?.pause();
+      this.media = null;
+    }
     if (this.ctx && this.master) {
       this.master.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.08);
       if (on) this.ctx.resume();
