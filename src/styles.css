@@ -56,9 +56,10 @@ small { font-size: 0.8em; line-height: 1.35; }
   background: #1a1a1a linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 32px 32px,
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 32px 32px;
 }
+/* A 9:16 frame on wide screens; on phones taller than 9:16 it fills the whole
+   height (up to 9:21) instead of leaving dark bands above and below. */
 #app {
-  aspect-ratio: 9 / 16;
-  height: min(100cqh, calc(100cqw * 16 / 9));
+  height: min(100cqh, calc(100cqw * 21 / 9));
   width: min(100cqw, calc(100cqh * 9 / 16));
   position: relative;
   overflow: hidden;
