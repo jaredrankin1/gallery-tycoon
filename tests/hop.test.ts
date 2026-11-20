@@ -33,3 +33,19 @@ describe('paper-cutout hopping', () => {
     expect(popHop(HOP.popTime * 2)).toEqual({ lift: 0, tilt: 0, sx: 1, sy: 1 });
   });
 });
+
+describe('patrons', () => {
+  it('has a sprite for every patron, sized like the other visitors', async () => {
+    const { PATRON_SPRITES } = await import('../src/data/patrons');
+    const meta = (await import('../src/assets/sprites/sprites.json')).default as unknown as Record<string, { cell: [number, number]; ref?: number }>;
+    expect(PATRON_SPRITES).toHaveLength(80);
+    const heights = PATRON_SPRITES.map((p) => {
+      expect(meta[p]).toBeDefined();
+      return (meta[p].cell[1] * 68) / (meta[p].ref ?? meta[p].cell[1]);
+    });
+    const sorted = [...heights].sort((a, b) => a - b);
+    // the typical patron stands as tall as the existing visitors (61-64px on screen)
+    expect(sorted[40]).toBeGreaterThan(58);
+    expect(sorted[40]).toBeLessThan(66);
+  });
+});

@@ -2,6 +2,7 @@ import { addFame } from './careers';
 import { CAREER, FIXTURE, GUESTS, MOODS, TIME, trafficShare } from '../config';
 import { clamp, type Rng } from '../rng';
 import { GUEST_SEEDS } from '../../data/guests';
+import { PATRON_SPRITES } from '../../data/patrons';
 import { FIRST_NAMES, LAST_NAMES } from '../../data/names';
 import type { Fixture, FloorPlan, GameState, Guest, GuestAnim, GuestVisit, Mood, ScheduledEvent, VisitStep } from '../types';
 import { sellArtwork } from '../venues/gallery';
@@ -320,12 +321,21 @@ const UNIQUE_LOOKS = ['beatrix', 'hana'];
 const CROWD_SPRITES = GUEST_SEEDS.map((g) => g.sprite).filter((s) => !UNIQUE_LOOKS.includes(s));
 /** Recolours per sprite (see render/sprites.ts). 0 is the named character's own look. */
 export const CROWD_VARIANTS = 5;
+/** Share of the public drawn from the patron sheets; the rest are recoloured regulars. */
+export const PATRON_SHARE = 0.6;
+
+/** What a stranger looks like: one of the patrons as they are, or a recoloured regular. */
+function crowdLook(rng: Rng): { sprite: string; variant: number } {
+  if (rng.chance(PATRON_SHARE)) return { sprite: rng.pick(PATRON_SPRITES), variant: 0 };
+  return { sprite: rng.pick(CROWD_SPRITES), variant: 1 + Math.floor(rng.next() * (CROWD_VARIANTS - 1)) };
+}
+
 const CROWD_TAGS = ['painting', 'portrait', 'landscape', 'colorful', 'pop', 'classic', 'quiet', 'moody', 'fantasy', 'weird', 'retro', 'digital', 'sculpture', 'figurative'];
 
 /** One ordinary visitor: a stranger with a name, a couple of passing tastes and a mood of their own. */
 function crowdVisit(state: GameState, start: number, rng: Rng, occ: Occupancy, event = false): GuestVisit {
   const id = `c${state.nextId++}`;
-  const look = { sprite: rng.pick(CROWD_SPRITES), variant: 1 + Math.floor(rng.next() * (CROWD_VARIANTS - 1)) };
+  const look = crowdLook(rng);
   const name = randomName(rng);
   const stranger = {
     id,

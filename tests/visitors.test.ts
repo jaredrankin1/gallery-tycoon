@@ -138,3 +138,16 @@ describe('moods', () => {
     expect(early).toBeGreaterThan(0);
   });
 });
+
+describe('the public', () => {
+  it('mixes patrons in with the recoloured regulars', () => {
+    let s = hung('museum', 11);
+    const looks: { sprite: string; variant: number }[] = [];
+    for (let i = 0; i < 24 * 3; i++) {
+      s = run(s, { type: 'tick', hours: 1 });
+      for (const v of s.visits) if (v.look) looks.push(v.look);
+    }
+    expect(looks.some((l) => l.sprite.startsWith('patron-') && l.variant === 0)).toBe(true);
+    expect(looks.some((l) => !l.sprite.startsWith('patron-') && l.variant > 0)).toBe(true);
+  });
+});
