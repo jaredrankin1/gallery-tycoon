@@ -29,6 +29,8 @@ const TOAST_BAND = 0.6;
 
 /** Sculpture sprites are cut at this many times their size on the floor (for sharp zoom). */
 const SCULPTURE_SCALE = 2.8;
+/** A wall work at least this many times wider than tall hangs across two tiles when it can. */
+const WIDE_SPAN_RATIO = 2.2;
 import { hueOf, roomBounds, TILE_W, toGrid, toScreen, WALL_H, type Pt } from './iso';
 
 export interface Theme {
@@ -381,7 +383,12 @@ export class IsoRenderer {
     }
 
     // Wall art sits on the wall plane, behind everything on the floor.
-    for (const f of shown) if (f.kind === 'wallHang') this.drawWallHang(f);
+    // Very wide works stretch over the next wall tile when nothing hangs there.
+    const spans = this.wallSpans(shown);
+    for (const f of shown) {
+      if (f.kind !== 'wallHang' || (!f.artworkId && spans.covered.has(`${f.x},${f.y}`))) continue;
+      this.drawWallHang(f, spans.from.get(f.id));
+    }
 
     // Depth-sort floor objects and people by x + y.
     type Drawable = { depth: number; draw: () => void };
@@ -549,15 +556,48 @@ export class IsoRenderer {
     }
   }
 
-  /** A framed picture on the back wall above tile (f.x, f.y). */
-  private drawWallHang(f: Fixture) {
+  /**
+   * Which wall works are wide enough (panoramas, about 2.2:1 or wider) to hang
+   * across two tiles, and which tiles they cover. A wide work takes the next
+   * tile along its wall, or else the previous one, as long as no art hangs
+   * there; an empty wall spot under it is hidden. If both neighbours hold art
+   * it stays on its own tile.
+   */
+  private wallSpans(shown: Fixture[]) {
+    const from = new Map<string, number>();
+    const covered = new Set<string>();
+    const floor = this.state!.floor;
+    const hung = new Set(shown.filter((f) => f.kind === 'wallHang' && f.artworkId).map((f) => `${f.x},${f.y}`));
+    for (const f of shown) {
+      if (f.kind !== 'wallHang' || !f.artworkId) continue;
+      const pic = this.imageFor(f.artworkId);
+      if (!pic || !pic.width || pic.width < pic.height * WIDE_SPAN_RATIO) continue;
+      const onLeft = f.x === 0;
+      const at = onLeft ? f.y : f.x;
+      const [min, max] = onLeft ? [0, floor.height - 1] : [1, floor.width - 1];
+      for (const n of [at + 1, at - 1]) {
+        const key = onLeft ? `0,${n}` : `${n},0`;
+        if (n < min || n > max || hung.has(key) || covered.has(key)) continue;
+        covered.add(key);
+        covered.add(`${f.x},${f.y}`);
+        from.set(f.id, Math.min(at, n));
+        break;
+      }
+    }
+    return { from, covered };
+  }
+
+  /** A framed picture on the back wall above tile (f.x, f.y), or across two tiles from `spanFrom`. */
+  private drawWallHang(f: Fixture, spanFrom?: number) {
     const onLeft = f.x === 0;
     const pic = f.artworkId ? this.imageFor(f.artworkId) : null;
     // Landscape canvases get a wider, shorter frame, centred where a tall one would hang.
     const wide = !!pic && pic.width > pic.height;
     const m = wide ? 0.02 : 0.08;
-    const a = onLeft ? toScreen(0, f.y + m) : toScreen(f.x + m, 0);
-    const b = onLeft ? toScreen(0, f.y + 1 - m) : toScreen(f.x + 1 - m, 0);
+    const start = spanFrom ?? (onLeft ? f.y : f.x);
+    const len = spanFrom === undefined ? 1 : 2;
+    const a = onLeft ? toScreen(0, start + m) : toScreen(start + m, 0);
+    const b = onLeft ? toScreen(0, start + len - m) : toScreen(start + len - m, 0);
     let lo = 18;
     let hi = 72;
     if (wide) {
